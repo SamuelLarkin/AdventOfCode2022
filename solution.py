@@ -8,10 +8,10 @@ from typing import (
 
 
 
-def parser() -> Generator[, None, None]:
+def parser(data: str="data") -> Generator[, None, None]:
     """
     """
-    with open("data", mode="r", encoding="UTF8") as fin:
+    with open(data, mode="r", encoding="UTF8") as fin:
         for line in map(str.strip, fin):
             pass
 
