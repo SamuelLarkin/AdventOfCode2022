@@ -1,8 +1,10 @@
 #!/usr/bin/env  python3
 
 from typing import (
+        Callable,
         Generator,
         List,
+        Sequence,
         Tuple,
         )
 
