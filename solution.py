@@ -3,9 +3,12 @@
 from typing import (
         Callable,
         Generator,
+        Iterable,
         List,
+        NamedTuple,
         Sequence,
         Tuple,
+        Union,
         )
 
 
