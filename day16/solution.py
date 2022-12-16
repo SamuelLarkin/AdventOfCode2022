@@ -20,6 +20,8 @@ import re
 
 
 
+MINUTES = 30
+START = "AA"
 valve_re = re.compile(r"Valve (?P<valve>..) has flow rate=(?P<flow>\d+); tunnels? leads? to valves? (?P<lead>.*)")
 
 
@@ -28,9 +30,10 @@ class State(NamedTuple):
     """
     """
     # Order of attributes matters to properly order the heapq.
-    minutes: int
+    remaining_minutes: int
     score: int
     future_score: int
+    pressure: int
     name: str
     open_valves: Set[str]=frozenset()
 
@@ -38,7 +41,12 @@ class State(NamedTuple):
     def expected_score(self) -> int:
         """
         """
-        return self.score + self.future_score
+        return self.score + self.remaining_minutes*self.pressure + self.future_score
+
+    def __lt__(self, other):
+        """
+        """
+        return self.expected_score > other.expected_score
 
 
 
@@ -66,12 +74,12 @@ def parser(data: str="data") -> nx.Graph:
 def expected_future_score(
         visited_valves,
         ordered_valves,
-        minutes: int,
+        remaining_minutes: int,
         ) -> int:
     """
     """
     remaining_valves = {k: v for k, v in ordered_valves.items() if k not in visited_valves}
-    flow_minutes = zip(remaining_valves.values(), range(minutes, 0, -2))
+    flow_minutes = zip(remaining_valves.values(), range(remaining_minutes, 0, -2))
     future_score = sum(flow*minutes for flow, minutes in flow_minutes)
 
     return future_score
@@ -80,9 +88,8 @@ def expected_future_score(
 
 def part1() -> int:
     """
+    What is the most pressure you can release?
     """
-    MINUTES = 30
-    START = "AA"
     G = parser("test")
     print(*G.nodes(data=True), sep="\n")
     ordered_valves = {
@@ -99,35 +106,54 @@ def part1() -> int:
     visited = [State(
         name=START,
         score=0,
-        future_score=-expected_future_score({START}, ordered_valves, MINUTES-0),
+        future_score=expected_future_score({START}, ordered_valves, MINUTES-0),
+        pressure=0,
         open_valves=frozenset({START}),
-        minutes=0,
+        remaining_minutes=MINUTES,
         )]
     while len(visited) > 0:
+        heapq.heapify(visited)
         current = heapq.heappop(visited)
+        best = min(best, current.score)
 
-        if current.minutes >= MINUTES:
+        if current.remaining_minutes <= 0:
             print(len(visited))
             print(*sorted(visited, key=lambda s: s.score, reverse=True), sep="\n")
-            return -current.score
+            return current.score
 
         if current.name not in current.open_valves:
             # Opening a valve.
-            minutes = current.minutes + 1
+            remaining_minutes = current.remaining_minutes - 1
             flow = G.nodes[current.name]["flow"]
-            open_valves=frozenset(current.open_valves | {current.name})
-            current = State(
-                    name=current.name,
-                    score=current.score - flow * (MINUTES - minutes),
-                    future_score=-expected_future_score(open_valves, ordered_valves, MINUTES-minutes),
-                    open_valves=open_valves,
-                    minutes=minutes,
-                    )
-            assert current.score <= 0
-            best = min(best, current.score)
-            heapq.heappush(visited, current)
+            pressure = current.pressure + flow
+            open_valves = frozenset(current.open_valves | {current.name})
 
-        if best < current.expected_score:
+            # TODO if all valve are open, compute final score
+            if len(open_valves) == len(ordered_valves):
+                current = State(
+                        name=current.name,
+                        score=current.score + pressure*(remaining_minutes+1),
+                        future_score=0,
+                        pressure=pressure,
+                        open_valves=open_valves,
+                        remaining_minutes=0,
+                        )
+                visited.append(current)
+                continue
+            else:
+                current = State(
+                        name=current.name,
+                        score=current.score+pressure,
+                        future_score=expected_future_score(open_valves, ordered_valves, remaining_minutes),
+                        pressure=pressure,
+                        open_valves=open_valves,
+                        remaining_minutes=remaining_minutes,
+                        )
+
+            if current.expected_score > best:
+                visited.append(current)
+
+        if best > current.expected_score:
             """
             From this current state, even if we are optimistic, it is NOT
             possible to beat the best state so far.
@@ -136,22 +162,24 @@ def part1() -> int:
 
         for neighbor in nx.neighbors(G, current.name):
             # Moving to a neighbor.
+            remaining_minutes = current.remaining_minutes - 1
             possible_valve = State(
                         name=neighbor,
-                        score=current.score,
-                        future_score=current.future_score,
+                        remaining_minutes=remaining_minutes,
+                        score=current.score+current.pressure,
+                        # Note that the future score should be less because a minute pass.
+                        future_score=expected_future_score(current.open_valves, ordered_valves, remaining_minutes),
+                        pressure=current.pressure,
                         open_valves=current.open_valves,
-                        minutes=current.minutes+1,
                         )
-            assert possible_valve.score <= 0
-            heapq.heappush(visited, possible_valve)
+            if current.expected_score > best:
+                visited.append(possible_valve)
 
         if True:
             """
             It is critical not to add states that are already in the visited list.
             """
-            visited = list(set(visited))
-            heapq.heapify(visited)
+            visited = [state for state in set(visited) if state.expected_score > best]
 
     return None
 
