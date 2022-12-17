@@ -2,6 +2,10 @@
 
 from dataclasses import dataclass
 from operator import itemgetter
+from itertools import (
+        combinations,
+        tee,
+        )
 from typing import (
         Callable,
         Generator,
@@ -23,6 +27,14 @@ import re
 MINUTES = 30
 START = "AA"
 valve_re = re.compile(r"Valve (?P<valve>..) has flow rate=(?P<flow>\d+); tunnels? leads? to valves? (?P<lead>.*)")
+
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
 
 
 
@@ -67,7 +79,14 @@ def parser(data: str="data") -> nx.Graph:
             G.nodes[valve]["name"] = valve
             G.nodes[valve]["flow"] = flow
 
-    return G
+    G2 = nx.Graph()
+    a = list(filter(lambda n: n[1]["flow"] > 0 or n[0]=="AA", G.nodes(data=True)))
+    for (u, ud), (v, vd) in combinations(a, 2):
+        G2.add_node(u, **ud)
+        G2.add_node(v, **vd)
+        G2.add_edge(u, v, weight=len(nx.shortest_path(G, u, v))-1)
+
+    return G, G2
 
 
 
@@ -86,11 +105,11 @@ def expected_future_score(
 
 
 
-def part1() -> int:
+def part1a() -> int:
     """
     What is the most pressure you can release?
     """
-    G = parser("test")
+    G, _ = parser("test")
     print(*G.nodes(data=True), sep="\n")
     ordered_valves = {
             k: v
@@ -101,6 +120,24 @@ def part1() -> int:
                 )
             }
     print(ordered_valves)
+
+    def generate_neighbors(current: State) -> Generator[State, None, None]:
+        """
+        """
+        for neighbor in nx.neighbors(G, current.name):
+            # Moving to a neighbor.
+            remaining_minutes = current.remaining_minutes - 1
+            possible_valve = State(
+                        name=neighbor,
+                        remaining_minutes=remaining_minutes,
+                        score=current.score+current.pressure,
+                        # Note that the future score should be less because a minute pass.
+                        future_score=expected_future_score(current.open_valves, ordered_valves, remaining_minutes),
+                        pressure=current.pressure,
+                        open_valves=current.open_valves,
+                        )
+            yield possible_valve
+
 
     best = 0
     visited = [State(
@@ -116,10 +153,20 @@ def part1() -> int:
         current = heapq.heappop(visited)
         best = min(best, current.score)
 
-        if current.remaining_minutes <= 0:
+        if current.remaining_minutes <= 1:
             print(len(visited))
             print(*sorted(visited, key=lambda s: s.score, reverse=True), sep="\n")
             return current.score
+
+        if best > current.expected_score:
+            """
+            From this current state, even if we are optimistic, it is NOT
+            possible to beat the best state so far.
+            """
+            continue
+
+        # We move to the neighbors without opening the valve.
+        visited.extend(list(generate_neighbors(current)))
 
         if current.name not in current.open_valves:
             # Opening a valve.
@@ -129,7 +176,7 @@ def part1() -> int:
             open_valves = frozenset(current.open_valves | {current.name})
 
             # TODO if all valve are open, compute final score
-            if len(open_valves) == len(ordered_valves):
+            if False and len(open_valves) == len(ordered_valves):
                 current = State(
                         name=current.name,
                         score=current.score + pressure*(remaining_minutes+1),
@@ -150,8 +197,76 @@ def part1() -> int:
                         remaining_minutes=remaining_minutes,
                         )
 
-            if current.expected_score > best:
-                visited.append(current)
+            visited.append(current)
+
+        # Visit the neighbors AFTER having open the valve.
+        visited.extend(list(generate_neighbors(current)))
+
+        if True:
+            """
+            It is critical not to add states that are already in the visited list.
+            """
+            visited = [state for state in set(visited) if state.expected_score > best]
+
+    return None
+
+
+
+def part1() -> int:
+    """
+    What is the most pressure you can release?
+    """
+   # _, G = parser("test")
+    _, G = parser()
+    print(*G.nodes(data=True), sep="\n")
+    print(*G.edges(data=True), sep="\n")
+    ordered_valves = {
+            k: v
+            for k, v in sorted(
+                map(lambda t: (t[0], t[1]["flow"]), G.nodes(data=True)),
+                key=itemgetter(1),
+                reverse=True,
+                )
+            }
+    print(ordered_valves)
+
+    def generate_neighbors(current: State) -> Generator[State, None, None]:
+        """
+        """
+        for neighbor in nx.neighbors(G, current.name):
+            # Moving to a neighbor.
+            travel_time = G[current.name][neighbor]["weight"]
+            remaining_minutes = current.remaining_minutes - travel_time
+            possible_valve = State(
+                        name=neighbor,
+                        remaining_minutes=remaining_minutes,
+                        score=current.score + travel_time*current.pressure,
+                        # Note that the future score should be less because a minute pass.
+                        future_score=expected_future_score(current.open_valves, ordered_valves, remaining_minutes),
+                        pressure=current.pressure,
+                        open_valves=current.open_valves,
+                        )
+            yield possible_valve
+
+
+    best = 0
+    visited = [State(
+        name=START,
+        score=0,
+        future_score=expected_future_score({START}, ordered_valves, MINUTES-0),
+        pressure=0,
+        open_valves=frozenset({START}),
+        remaining_minutes=MINUTES,
+        )]
+    while len(visited) > 0:
+        heapq.heapify(visited)
+        current = heapq.heappop(visited)
+        best = min(best, current.score)
+
+        if current.remaining_minutes <= 1:
+            print(len(visited))
+            print(*sorted(visited, key=lambda s: s.score, reverse=True), sep="\n")
+            return current.score
 
         if best > current.expected_score:
             """
@@ -160,20 +275,42 @@ def part1() -> int:
             """
             continue
 
-        for neighbor in nx.neighbors(G, current.name):
-            # Moving to a neighbor.
+        # We move to the neighbors without opening the valve.
+        visited.extend(list(generate_neighbors(current)))
+
+        if current.name not in current.open_valves:
+            # Opening a valve.
             remaining_minutes = current.remaining_minutes - 1
-            possible_valve = State(
-                        name=neighbor,
-                        remaining_minutes=remaining_minutes,
-                        score=current.score+current.pressure,
-                        # Note that the future score should be less because a minute pass.
-                        future_score=expected_future_score(current.open_valves, ordered_valves, remaining_minutes),
-                        pressure=current.pressure,
-                        open_valves=current.open_valves,
+            flow = G.nodes[current.name]["flow"]
+            pressure = current.pressure + flow
+            open_valves = frozenset(current.open_valves | {current.name})
+
+            # TODO if all valve are open, compute final score
+            if False and len(open_valves) == len(ordered_valves):
+                current = State(
+                        name=current.name,
+                        score=current.score + pressure*(remaining_minutes+1),
+                        future_score=0,
+                        pressure=pressure,
+                        open_valves=open_valves,
+                        remaining_minutes=0,
                         )
-            if current.expected_score > best:
-                visited.append(possible_valve)
+                visited.append(current)
+                continue
+            else:
+                current = State(
+                        name=current.name,
+                        score=current.score+pressure,
+                        future_score=expected_future_score(open_valves, ordered_valves, remaining_minutes),
+                        pressure=pressure,
+                        open_valves=open_valves,
+                        remaining_minutes=remaining_minutes,
+                        )
+
+            visited.append(current)
+
+        # Visit the neighbors AFTER having open the valve.
+        visited.extend(list(generate_neighbors(current)))
 
         if True:
             """
@@ -197,7 +334,7 @@ def part2() -> int:
 if __name__ == "__main__":
     answer = part1()
     print(f"Part1 answer: {answer}")
-    assert answer == 69289
+    assert answer == 2124
 
     answer = part2()
     print(f"Part2 answer: {answer}")
