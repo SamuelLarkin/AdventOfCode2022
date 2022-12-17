@@ -82,21 +82,6 @@ def parser(data: str="data") -> nx.Graph:
 
 
 
-def expected_future_score(
-        visited_valves,
-        ordered_valves,
-        remaining_minutes: int,
-        ) -> int:
-    """
-    """
-    remaining_valves = {k: v for k, v in ordered_valves.items() if k not in visited_valves}
-    flow_minutes = zip(remaining_valves.values(), range(remaining_minutes, 0, -2))
-    future_score = sum(flow*minutes for flow, minutes in flow_minutes)
-
-    return future_score
-
-
-
 def part1() -> int:
     """
     What is the most pressure you can release?
@@ -115,6 +100,21 @@ def part1() -> int:
                 )
             }
     print(ordered_valves)
+
+    def expected_future_score(
+            visited_valves,
+            ordered_valves,
+            remaining_minutes: int,
+            ) -> int:
+        """
+        The future score is optimisitic.
+        What if we could simultaneously open all remaining valves for the rest of the remaining minutes?
+        """
+        remaining_valves = {k: v for k, v in ordered_valves.items() if k not in visited_valves}
+        flow_minutes = zip(remaining_valves.values(), range(remaining_minutes, 0, -2))
+        future_score = sum(flow*minutes for flow, minutes in flow_minutes)
+
+        return future_score
 
     def generate_neighbors(current: State) -> Generator[State, None, None]:
         """
@@ -218,6 +218,7 @@ def part2() -> int:
     """
     MINUTES = 26
     G, _ = parser("test")
+    #G, _ = parser()
     #print(*G.nodes(data=True), sep="\n")
     #print(*G.edges(data=True), sep="\n")
     ordered_valves = {
@@ -236,6 +237,26 @@ def part2() -> int:
                 filter(lambda v: v[1]["flow"] > 0, G.nodes(data=True))))
     print(valves_with_flow)
 
+    valves_without_flow = frozenset(
+            map(
+                itemgetter(0),
+                filter(lambda v: v[1]["flow"] == 0, G.nodes(data=True))))
+    print(valves_without_flow)
+
+    def expected_future_score(
+            visited_valves,
+            ordered_valves,
+            remaining_minutes: int,
+            ) -> int:
+        """
+        The future score is optimisitic.
+        What if we could simultaneously open all remaining valves for the rest of the remaining minutes?
+        """
+        remaining_valves = {k: v for k, v in ordered_valves.items() if k not in visited_valves}
+        future_score = sum(remaining_valves.values()) * remaining_minutes
+
+        return future_score
+
     def finalize(state: State) -> State:
         """
         """
@@ -247,7 +268,7 @@ def part2() -> int:
                     pressure=state.pressure,
                     future_score=0,
                     remaining_minutes=0,
-                    score=state.score + state.pressure*state.remaining_minutes,
+                    score=state.score + state.pressure*(state.remaining_minutes-1),
                     )
         else:
             return state
@@ -280,7 +301,7 @@ def part2() -> int:
         pressure=0,
         score=0,
         future_score=expected_future_score({START}, ordered_valves, MINUTES),
-        open_valves=frozenset({START}),
+        open_valves=frozenset({START} | valves_without_flow),
         remaining_minutes=MINUTES,
         )]
     while len(visited) > 0:
@@ -289,7 +310,7 @@ def part2() -> int:
         heapq.heapify(visited)
         current = heapq.heappop(visited)
 
-        if current.remaining_minutes <= 1:
+        if current.remaining_minutes <= 0:
             print(current)
             print(len(visited))
             print(*sorted(visited, key=lambda s: s.score, reverse=True), sep="\n")
@@ -385,7 +406,7 @@ def part2() -> int:
 
 
 if __name__ == "__main__":
-    if False:
+    if True:
         answer = part1()
         print(f"Part1 answer: {answer}")
         assert answer == 2124
