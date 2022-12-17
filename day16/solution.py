@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from operator import itemgetter
 from itertools import (
         combinations,
+        product,
         )
 from typing import (
         Callable,
@@ -23,7 +24,6 @@ import re
 
 
 
-MINUTES = 30
 START = "AA"
 valve_re = re.compile(r"Valve (?P<valve>..) has flow rate=(?P<flow>\d+); tunnels? leads? to valves? (?P<lead>.*)")
 
@@ -38,6 +38,7 @@ class State(NamedTuple):
     future_score: int
     pressure: int
     name: str
+    elephant: str=""   # part 2
     open_valves: Set[str]=frozenset()
 
     @property
@@ -66,7 +67,7 @@ def parser(data: str="data") -> nx.Graph:
             flow = int(m.group("flow"))
             leads = map(str.strip, m.group("lead").split(","))
             for destination in leads:
-                G.add_edge(valve, destination)
+                G.add_edge(valve, destination, weight=1)
             G.nodes[valve]["name"] = valve
             G.nodes[valve]["flow"] = flow
 
@@ -100,10 +101,11 @@ def part1() -> int:
     """
     What is the most pressure you can release?
     """
+    MINUTES = 30
     #_, G = parser("test")
     _, G = parser()
-    print(*G.nodes(data=True), sep="\n")
-    print(*G.edges(data=True), sep="\n")
+    #print(*G.nodes(data=True), sep="\n")
+    #print(*G.edges(data=True), sep="\n")
     ordered_valves = {
             k: v
             for k, v in sorted(
@@ -137,7 +139,7 @@ def part1() -> int:
     visited = [State(
         name=START,
         score=0,
-        future_score=expected_future_score({START}, ordered_valves, MINUTES-0),
+        future_score=expected_future_score({START}, ordered_valves, MINUTES),
         pressure=0,
         open_valves=frozenset({START}),
         remaining_minutes=MINUTES,
@@ -157,6 +159,7 @@ def part1() -> int:
             From this current state, even if we are optimistic, it is NOT
             possible to beat the best state so far.
             """
+            print(f"Dropping {current}")
             continue
 
         # We move to the neighbors without opening the valve.
@@ -200,7 +203,9 @@ def part1() -> int:
             """
             It is critical not to add states that are already in the visited list.
             """
+            presize = len(visited)
             visited = [state for state in set(visited) if state.expected_score > best]
+            #print(f"Dropped {presize-len(visited)}")
 
     return None
 
@@ -211,7 +216,168 @@ def part2() -> int:
     With you and an elephant working together for 26 minutes, what is the most
     pressure you could release?
     """
-    _, G = parser()
+    MINUTES = 26
+    G, _ = parser("test")
+    #print(*G.nodes(data=True), sep="\n")
+    #print(*G.edges(data=True), sep="\n")
+    ordered_valves = {
+            k: v
+            for k, v in sorted(
+                map(lambda t: (t[0], t[1]["flow"]), G.nodes(data=True)),
+                key=itemgetter(1),
+                reverse=True,
+                )
+            }
+    print(ordered_valves)
+
+    valves_with_flow = frozenset(
+            map(
+                itemgetter(0),
+                filter(lambda v: v[1]["flow"] > 0, G.nodes(data=True))))
+    print(valves_with_flow)
+
+    def finalize(state: State) -> State:
+        """
+        """
+        if len(valves_with_flow - state.open_valves) == 0:
+            return State(
+                    name=state.name,
+                    elephant=state.elephant,
+                    open_valves=state.open_valves,
+                    pressure=state.pressure,
+                    future_score=0,
+                    remaining_minutes=0,
+                    score=state.score + state.pressure*state.remaining_minutes,
+                    )
+        else:
+            return state
+
+    def generate_neighbors(current: State) -> Generator[State, None, None]:
+        """
+        """
+        for name, elephant in product(nx.neighbors(G, current.name), nx.neighbors(G, current.elephant)):
+            if name == elephant:
+                continue
+            # Moving to our neighbor.
+            remaining_minutes = current.remaining_minutes - 1
+            possible_valve = State(
+                        name=name,
+                        elephant=elephant,
+                        remaining_minutes=remaining_minutes,
+                        score=current.score + 1*current.pressure,
+                        # Note that the future score should be less because a minute pass.
+                        future_score=expected_future_score(current.open_valves, ordered_valves, remaining_minutes),
+                        pressure=current.pressure,
+                        open_valves=current.open_valves,
+                        )
+            yield possible_valve
+
+
+    best = 0
+    visited = [State(
+        name=START,
+        elephant=START,
+        pressure=0,
+        score=0,
+        future_score=expected_future_score({START}, ordered_valves, MINUTES),
+        open_valves=frozenset({START}),
+        remaining_minutes=MINUTES,
+        )]
+    while len(visited) > 0:
+        #best = min(best, current.score)
+        best = min(best, min(state.score for state in visited))
+        heapq.heapify(visited)
+        current = heapq.heappop(visited)
+
+        if current.remaining_minutes <= 1:
+            print(current)
+            print(len(visited))
+            print(*sorted(visited, key=lambda s: s.score, reverse=True), sep="\n")
+            return current.score
+
+        if best > current.expected_score:
+            """
+            From this current state, even if we are optimistic, it is NOT
+            possible to beat the best state so far.
+            """
+            print(f"Dropping {current}")
+            continue
+
+        # We move to the neighbors without opening the valve.
+        #visited.extend(list(generate_neighbors(current)))
+
+        # Both the elephant and I can act during the next minute.
+        # We both visit our neighbors.
+        visited.extend(generate_neighbors(current))
+
+        remaining_minutes = current.remaining_minutes - 1
+        if current.name not in current.open_valves:
+            # I open a valve while the elephant visit its neighbors.
+            flow = G.nodes[current.name]["flow"]
+            pressure = current.pressure+flow
+            open_valves = frozenset(current.open_valves | {current.name})
+
+            visited.extend(
+                    State(
+                        name=current.name,
+                        elephant=neighbor,
+                        score=current.score + 1*pressure,
+                        pressure=pressure,
+                        open_valves=open_valves,
+                        remaining_minutes=remaining_minutes,
+                        future_score=expected_future_score(open_valves, ordered_valves, remaining_minutes),
+                        )
+                    for neighbor in nx.neighbors(G, current.elephant))
+
+        if current.elephant not in current.open_valves:
+            # Now the elephant is opening a valve while I move to a neighbor.
+            flow = G.nodes[current.elephant]["flow"]
+            pressure = current.pressure+flow
+            open_valves = frozenset(current.open_valves | {current.elephant})
+
+            visited.extend(
+                    State(
+                        name=neighbor,
+                        elephant=current.elephant,
+                        score=current.score + 1*pressure,
+                        pressure=pressure,
+                        open_valves=open_valves,
+                        remaining_minutes=remaining_minutes,
+                        future_score=expected_future_score(open_valves, ordered_valves, remaining_minutes),
+                        )
+                    for neighbor in nx.neighbors(G, current.name))
+
+        if current.name != current.elephant \
+                and current.elephant not in current.open_valves \
+                and current.name not in current.open_valves:
+            # Now the elephant is opening a valve while I move to a neighbor.
+            flow = G.nodes[current.elephant]["flow"]
+            flow += G.nodes[current.name]["flow"]
+            pressure = current.pressure+flow
+            open_valves = frozenset(current.open_valves | {current.name, current.elephant})
+
+            visited.append(
+                    State(
+                        name=current.name,
+                        elephant=current.elephant,
+                        score=current.score + 1*pressure,
+                        pressure=pressure,
+                        open_valves=open_valves,
+                        remaining_minutes=remaining_minutes,
+                        future_score=expected_future_score(open_valves, ordered_valves, remaining_minutes),
+                        ))
+
+        if True:
+            visited = [finalize(state) for state in visited]
+
+        if True:
+            """
+            It is critical not to add states that are already in the visited list.
+            """
+            presize = len(visited)
+            visited = [state for state in set(visited) if state.expected_score > best]
+            #print(f"Dropped {presize-len(visited)}")
+
     return None
 
 
@@ -219,9 +385,10 @@ def part2() -> int:
 
 
 if __name__ == "__main__":
-    answer = part1()
-    print(f"Part1 answer: {answer}")
-    assert answer == 2124
+    if False:
+        answer = part1()
+        print(f"Part1 answer: {answer}")
+        assert answer == 2124
 
     answer = part2()
     print(f"Part2 answer: {answer}")
