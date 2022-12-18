@@ -1,7 +1,10 @@
 #!/usr/bin/env  python3
 
 from dataclasses import dataclass
-from operator import itemgetter
+from operator import (
+        attrgetter,
+        itemgetter,
+        )
 from itertools import (
         combinations,
         product,
@@ -50,7 +53,8 @@ class State(NamedTuple):
     def __lt__(self, other):
         """
         """
-        return self.remaining_minutes > other.remaining_minutes and self.expected_score > other.expected_score
+        #return self.remaining_minutes > other.remaining_minutes and self.expected_score > other.expected_score
+        return self.expected_score > other.expected_score
 
 
 
@@ -97,6 +101,7 @@ def parser(data: str="data") -> nx.Graph:
     nodes_with_flow = list(filter(lambda n: n[1]["flow"] > 0 or n[0]=="AA", G.nodes(data=True)))
 
     # Create a fully connected graph of nodes with flow.
+    # This is analoguous to going from A -> B -> C but without opening the valve at B.
     G2 = nx.Graph()
     for (u, ud), (v, vd) in combinations(nodes_with_flow, 2):
         G2.add_node(u, **ud)
@@ -113,6 +118,7 @@ def part1() -> int:
     """
     MINUTES = 30
     G = parser("test")
+    G = parser()
     print(*G.nodes(data=True), sep="\n")
     print(*G.edges(data=True), sep="\n")
 
@@ -143,8 +149,8 @@ def part1() -> int:
         pressure=0,
         score=0,
         future_score=compute_future_score(G, START, remaining_valves, MINUTES),
-        remaining_valves=remaining_valves,
         remaining_minutes=MINUTES,
+        remaining_valves=remaining_valves,
         )]
 
     while len(visited) > 0:
@@ -153,33 +159,42 @@ def part1() -> int:
         best = min(best, current.score)
 
         if current.remaining_minutes <= 0:
-            print(current)
-            print(len(visited))
-            print(*sorted(visited, key=lambda s: s.score, reverse=True), sep="\n")
+            #print(current)
+            #print(len(visited))
+            #print(*sorted(visited, key=attrgetter("score"), reverse=True), sep="\n")
             return current.score
 
-        # We move to the neighbors without opening the valve.
-        visited.extend(list(generate_neighbors(current)))
-
+        # Opening the valve.
         if current.name in current.remaining_valves:
-            # Opening a valve.
-            flow = G.nodes[current.name]["flow"]
-            pressure = current.pressure + flow
+            # This if statement is to handle the initial starting state "AA".
             remaining_minutes = current.remaining_minutes - 1
             remaining_valves = frozenset(current.remaining_valves - {current.name})
 
             current = State(
                     name=current.name,
-                    score=current.score+pressure,
+                    score=current.score + 1*current.pressure,
                     future_score=compute_future_score(G, current.name, remaining_valves, remaining_minutes),
-                    pressure=pressure,
+                    pressure=current.pressure + G.nodes[current.name]["flow"],
                     remaining_valves=remaining_valves,
                     remaining_minutes=remaining_minutes,
                     )
 
+        if len(current.remaining_valves) == 0:
+            #print(current)
+            current = State(
+                    name=current.name,
+                    score=current.score + current.pressure*current.remaining_minutes,
+                    future_score=0,
+                    pressure=current.pressure,
+                    remaining_minutes=0,
+                    remaining_valves=current.remaining_valves,
+                    )
             visited.append(current)
+            #yield current
 
-        #visited.extend(list(generate_neighbors(current)))
+        # We move to the neighbors without opening the valve.
+        visited.extend(list(generate_neighbors(current)))
+
 
         if True:
             """
@@ -189,6 +204,9 @@ def part1() -> int:
             visited = [state for state in set(visited) if state.expected_score > best]
             #print(f"Dropped {presize-len(visited)}")
 
+    print(current)
+    print(len(visited))
+    print(*sorted(visited, key=lambda s: s.score, reverse=True), sep="\n")
     return None
 
 
@@ -389,9 +407,14 @@ def part2() -> int:
 
 if __name__ == "__main__":
     if True:
-        answer = part1()
-        print(f"Part1 answer: {answer}")
-        assert answer == 2124
+        if False:
+            answer = sorted(part1(), key=attrgetter("score"), reverse=True)
+            print(*answer, sep="\n")
+            answer = answer[0].score
+        else:
+            answer = part1()
+            print(f"Part1 answer: {answer}")
+            assert answer == 2124
 
     answer = part2()
     print(f"Part2 answer: {answer}")
