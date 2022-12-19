@@ -28,7 +28,44 @@ import re
 
 
 START = "AA"
-valve_re = re.compile(r"Valve (?P<valve>..) has flow rate=(?P<flow>\d+); tunnels? leads? to valves? (?P<lead>.*)")
+valve_re = re.compile(r"^Valve (?P<valve>..) has flow rate=(?P<flow>\d+); tunnels? leads? to valves? (?P<lead>.*)$")
+
+
+
+def parser(data: str="data") -> nx.Graph:
+    """
+    """
+    G = nx.Graph()
+    # Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
+    with open(data, mode="r", encoding="UTF8") as fin:
+        for line in map(str.strip, fin):
+            m = valve_re.match(line)
+            assert m is not None, line
+            valve = m.group("valve")
+            flow = int(m.group("flow"))
+            leads = map(str.strip, m.group("lead").split(","))
+            for destination in leads:
+                G.add_edge(valve, destination, weight=1)
+            #G.nodes[valve]["name"] = valve
+            G.nodes[valve]["flow"] = flow
+
+    s = list(nx.single_source_shortest_path(G, START))
+    print(data)
+    print(len(s))
+    print(*s, sep="\n")
+
+    # Remove node that can't contribute to the flow.
+    nodes_with_flow = list(filter(lambda n: n[1]["flow"] > 0 or n[0]=="AA", G.nodes(data=True)))
+
+    # Create a fully connected graph of nodes with flow.
+    # This is analoguous to going from A -> B -> C but without opening the valve at B.
+    G2 = nx.Graph()
+    for (u, ud), (v, vd) in combinations(nodes_with_flow, 2):
+        G2.add_node(u, **ud)
+        G2.add_node(v, **vd)
+        G2.add_edge(u, v, weight=len(nx.shortest_path(G, u, v))-1)
+
+    return G2
 
 
 
@@ -80,38 +117,6 @@ def compute_future_score(
 
 
 
-def parser(data: str="data") -> nx.Graph:
-    """
-    """
-    G = nx.Graph()
-    # Valve AA has flow rate=0; tunnels lead to valves DD, II, BB
-    with open(data, mode="r", encoding="UTF8") as fin:
-        for line in map(str.strip, fin):
-            m = valve_re.match(line)
-            assert m is not None, line
-            valve = m.group("valve")
-            flow = int(m.group("flow"))
-            leads = map(str.strip, m.group("lead").split(","))
-            for destination in leads:
-                G.add_edge(valve, destination, weight=1)
-            #G.nodes[valve]["name"] = valve
-            G.nodes[valve]["flow"] = flow
-
-    # Remove node that can't contribute to the flow.
-    nodes_with_flow = list(filter(lambda n: n[1]["flow"] > 0 or n[0]=="AA", G.nodes(data=True)))
-
-    # Create a fully connected graph of nodes with flow.
-    # This is analoguous to going from A -> B -> C but without opening the valve at B.
-    G2 = nx.Graph()
-    for (u, ud), (v, vd) in combinations(nodes_with_flow, 2):
-        G2.add_node(u, **ud)
-        G2.add_node(v, **vd)
-        G2.add_edge(u, v, weight=len(nx.shortest_path(G, u, v))-1)
-
-    return G2
-
-
-
 def part1() -> int:
     """
     What is the most pressure you can release?
@@ -119,12 +124,22 @@ def part1() -> int:
     MINUTES = 30
     G = parser("test")
     G = parser()
-    print(*G.nodes(data=True), sep="\n")
-    print(*G.edges(data=True), sep="\n")
+    if True:
+        print(*G.nodes(data=True), sep="\n")
+        print(*G.edges(data=True), sep="\n")
+        import matplotlib.pyplot as plt
+        pos = nx.circular_layout(G)
+        nx.draw(G, pos, with_labels=True)
+        #node_labels = nx.get_node_attributes(G, "weight")
+        #nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10)
+        edge_labels = nx.get_edge_attributes(G, "weight")
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+        plt.savefig("cave.png")
 
     def generate_neighbors(current: State) -> Generator[State, None, None]:
         """
         """
+        #print(len(current.remaining_valves))
         for next_valve in current.remaining_valves:
             if current.name == next_valve:
                 continue
@@ -163,6 +178,8 @@ def part1() -> int:
             #print(len(visited))
             #print(*sorted(visited, key=attrgetter("score"), reverse=True), sep="\n")
             return current.score
+
+        assert current.name == START or current.name in current.remaining_valves, current
 
         # Opening the valve.
         if current.name in current.remaining_valves:
