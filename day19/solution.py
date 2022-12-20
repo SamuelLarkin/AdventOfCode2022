@@ -58,6 +58,14 @@ class Material(NamedTuple):
                 geode=factor*self.geode,
                 )
 
+    def __le__(self, other: "Material") -> bool:
+        """
+        """
+        return self.ore <= other.ore \
+                and self.clay <= other.clay \
+                and self.obsidian <= other.obsidian \
+                and self.geode <= other.geode
+
 
 
 class Blueprint(NamedTuple):
@@ -102,7 +110,7 @@ def possible_robots(
         ) -> Generator[Tuple, None, None]:
     """
     """
-    for r_ore, r_clay, r_obsidian, r_geode in product(range(3), repeat=4):
+    for r_geode, r_obsidian, r_clay, r_ore in product(range(3), repeat=4):
         #if r_ore == 0 and r_clay == 0 and r_obsidian == 0 and r_geode == 0:
         #    continue
         cost = Material()
@@ -110,30 +118,25 @@ def possible_robots(
         cost += blueprint.robot_clay * r_clay
         cost += blueprint.robot_obsidian * r_obsidian
         cost += blueprint.robot_geode * r_geode
-        if cost < material:
+        if cost <= material:
             yield r_ore, r_clay, r_obsidian, r_geode
 
 
 
+class State(NamedTuple):
+    material: Material=Material()
+    robot_ore: int=1
+    robot_clay: int=0
+    robot_obsidian: int=0
+    robot_geode: int=0
+    minutes: int=0
 
-def extract_geodes(blueprint: Blueprint) -> int:
+
+
+def extract_geodes(blueprint: Blueprint, state: State=State()) -> int:
     """
     """
-    class State(NamedTuple):
-        material: Material=Material()
-        robot_ore: int=1
-        robot_clay: int=0
-        robot_obsidian: int=0
-        robot_geode: int=0
-        minutes: int=0
-
-    states = [State()]
-    while len(states) > 0:
-        state = states.pop()
-
-        if state.minutes >= MINUTES:
-            yield state
-
+    if state.minutes <= MINUTES:
         # We have new material
         state = state._replace(
                 material=Material(
@@ -152,16 +155,17 @@ def extract_geodes(blueprint: Blueprint) -> int:
                     - blueprint.robot_clay * r_clay \
                     - blueprint.robot_obsidian * r_obsidian \
                     - blueprint.robot_geode * r_geode
-            states.append(State(
+            new_state = State(
                 material=material,
                 robot_ore=state.robot_ore+r_ore,
                 robot_clay=state.robot_clay+r_clay,
                 robot_obsidian=state.robot_obsidian+r_obsidian,
                 robot_geode=state.robot_geode+r_geode,
                 minutes=state.minutes,
-                ))
-
-    pass
+                )
+            yield from extract_geodes(blueprint, new_state)
+    else:
+        yield state
 
 
 
@@ -171,10 +175,11 @@ def part1() -> int:
     """
     blueprints = list(parser("test"))
     #blueprints = list(parser())
-    print(*blueprints, sep="\n")
+    #print(*blueprints, sep="\n")
     for blueprint in blueprints:
-        geodes = list(extract_geodes(blueprint))
-        print(blueprint.bid, geodes)
+        print(blueprint)
+        for state in extract_geodes(blueprint):
+            print(state)
 
     return None
 
