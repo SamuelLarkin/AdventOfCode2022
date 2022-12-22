@@ -1,8 +1,11 @@
 #!/usr/bin/env  python3
 
+from enum import Enum
 from more_itertools import pairwise
+from operator import attrgetter
 from typing import (
         Callable,
+        Dict,
         Generator,
         Iterable,
         List,
@@ -12,8 +15,21 @@ from typing import (
         Union,
         )
 
-import networkx as nx
 import re
+
+
+
+class Direction(Enum):
+    R = 0
+    D = 1
+    L = 2
+    U = 3
+TURNS = {
+        Direction.R: {"R": Direction.D, "L": Direction.U},
+        Direction.D: {"R": Direction.L, "L": Direction.R},
+        Direction.L: {"R": Direction.U, "L": Direction.D},
+        Direction.U: {"R": Direction.R, "L": Direction.L},
+        }
 
 
 
@@ -21,27 +37,29 @@ class Position(NamedTuple):
     x: int
     y: int
 
-    def __add__(self, other) -> "Position":
-        return Position(self.x+other.x, self.y+other.y)
 
 
+class LocationInfo:
+    """
+    """
+    def __init__(self, type:str):
+        """
+        """
+        self.type = type
+        self.neighbors: Dict[Direction, Position] = {
+            Direction.R: None,
+            Direction.D: None,
+            Direction.L: None,
+            Direction.U: None,
+            }
 
-R = Position(1, 0)
-D = Position(0, 1)
-L = Position(-1 ,0)
-U = Position(0, -1)
-TURNS = {
-        R: {"R": D, "L": U},
-        D: {"R": L, "L": R},
-        L: {"R": U, "L": D},
-        U: {"R": R, "L": L},
-        }
-DIRECTION_SCORE = {
-        R: 0,
-        D: 1,
-        L: 2,
-        U: 3,
-        }
+    def __str__(self) -> str:
+        """
+        """
+        return f"LocationInfo(type={self.type}, neighbors={self.neighbors}"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 
@@ -52,15 +70,15 @@ class Instruction(NamedTuple):
 
 
 Instructions = List[Instruction]
+Carte = Dict[Position, LocationInfo]
 
 
 
-
-def parser(data: str="data") -> Tuple[nx.Graph, Position, Instructions]:
+def parser(data: str="data") -> Tuple[Carte, Position, Instructions]:
     """
     """
     instruction_re = re.compile(r"(\d+)([RUDL]?)")
-    G = nx.Graph()
+    G: Dict[Position, LocationInfo]={}
     start: Position=None
     with open(data, mode="r", encoding="UTF8") as fin:
         for y, line in enumerate(fin, start=1):
@@ -72,33 +90,34 @@ def parser(data: str="data") -> Tuple[nx.Graph, Position, Instructions]:
                     continue
                 if start is None and v == ".":
                     start = Position(x, y)
-                G.add_node(Position(x, y), type=v)
+                G[Position(x, y)] = LocationInfo(type=v)
 
         instructions = [
                 Instruction(int(steps), direction)
                 for steps, direction in instruction_re.findall(next(fin))
                 ]
 
-    def symlink(candidates) -> None:
-        """
-        """
+    maxy = max(map(attrgetter("y"), G.keys()))
+    for i in range(1, maxy):
+        candidates = sorted(
+                filter(lambda p: p.y == i, G.keys()),
+                key=attrgetter("x"),
+                )
         for a, b in pairwise(candidates + [candidates[0]]):
-            if a[1]["type"] != "#" and b[1]["type"] != "#":
-                G.add_edge(a[0], b[0])
+            if G[a].type != "#" and G[b].type != "#":
+                G[a].neighbors[Direction.R] = b
+                G[b].neighbors[Direction.L] = a
 
-    for i in range(1, y):
+    maxx = max(map(attrgetter("x"), G.keys()))
+    for i in range(1, maxx):
         candidates = sorted(
-                filter(lambda n: n[0].y == i, G.nodes(data=True)),
-                key=lambda n: n[0].x,
+                filter(lambda p: p.x == i, G.keys()),
+                key=attrgetter("y"),
                 )
-        symlink(candidates)
-
-    for i in range(1, x):
-        candidates = sorted(
-                filter(lambda n: n[0].x == i, G.nodes(data=True)),
-                key=lambda n: n[0].y,
-                )
-        symlink(candidates)
+        for a, b in pairwise(candidates + [candidates[0]]):
+            if G[a].type != "#" and G[b].type != "#":
+                G[a].neighbors[Direction.D] = b
+                G[b].neighbors[Direction.U] = a
 
     return G, start, instructions
 
@@ -109,15 +128,16 @@ def part1(data: str="data") -> int:
     What is the final password?
     """
     carte, position, instructions = parser(data)
-    print(*carte.nodes(data=True), sep="\n")
-    print(*carte.edges, sep="\n")
-    print(instructions)
-    print(position)
-    direction = Position(1, 0)
+    if False:
+        print(*carte.items(), sep="\n")
+        print(instructions)
+        print(position)
+
+    direction = Direction.R
     for instruction in instructions:
         for _ in range(instruction.step):
-            neighbor = position + direction
-            if neighbor not in carte[position]:
+            neighbor = carte[position].neighbors[direction]
+            if neighbor is None:
                 break
             else:
                 position = neighbor
@@ -126,7 +146,8 @@ def part1(data: str="data") -> int:
 
         delme = 4
 
-    return 1000*position.x + 4*position.y + DIRECTION_SCORE[direction]
+    print(position, direction)
+    return 1000*position.y + 4*position.x + direction.value
 
 
 
@@ -143,8 +164,9 @@ if __name__ == "__main__":
     assert (answer := part1("test")) == 6032, answer
     answer = part1()
     print(f"Part1 answer: {answer}")
-    assert answer == 69289
+    assert answer == 126350
 
+    assert (answer := part2("test")) == 6032, answer
     answer = part2()
     print(f"Part2 answer: {answer}")
     assert answer == 205615
