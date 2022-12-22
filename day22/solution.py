@@ -97,6 +97,13 @@ def parser(data: str="data") -> Tuple[Carte, Position, Instructions]:
                 for steps, direction in instruction_re.findall(next(fin))
                 ]
 
+    return G, start, instructions
+
+
+
+def wrap1(G: Carte) -> Carte:
+    """
+    """
     maxy = max(map(attrgetter("y"), G.keys()))
     for i in range(1, maxy):
         candidates = sorted(
@@ -119,7 +126,7 @@ def parser(data: str="data") -> Tuple[Carte, Position, Instructions]:
                 G[a].neighbors[Direction.D] = b
                 G[b].neighbors[Direction.U] = a
 
-    return G, start, instructions
+    return G
 
 
 
@@ -128,6 +135,7 @@ def part1(data: str="data") -> int:
     What is the final password?
     """
     carte, position, instructions = parser(data)
+    carte = wrap1(carte)
     if False:
         print(*carte.items(), sep="\n")
         print(instructions)
@@ -153,6 +161,7 @@ def part1(data: str="data") -> int:
 
 def part2(data: str="data") -> int:
     """
+    Fold the map into a cube, then follow the path given in the monkeys' notes. What is the final password?
     """
     return 0
 
