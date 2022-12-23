@@ -15,6 +15,7 @@ from typing import (
         Union,
         )
 
+import json
 import re
 
 
@@ -56,7 +57,12 @@ class LocationInfo:
     def __str__(self) -> str:
         """
         """
-        return f"LocationInfo(type={self.type}, neighbors={self.neighbors}"
+        n = "    ".join(f"{d}: {v}," for d, v in self.neighbors.items())
+        return f"""LocationInfo(
+    type={self.type},
+    neighbors={
+      {n}
+                })"""
 
     def __repr__(self) -> str:
         return str(self)
@@ -157,7 +163,7 @@ def part1(data: str="data") -> int:
     carte = wrap1(carte)
     if False:
         print(*carte.items(), sep="\n")
-        print(instructions)
+        print(*instructions, sep="\n")
         print(position)
 
     return solve(carte, position, instructions)
@@ -172,58 +178,58 @@ def wrap_test(carte: Carte) -> Carte:
         # A
         a = Position(width+1+i, width+1)
         b = Position(2*width+1, i+1)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.U] = (b, Direction.R) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.L] = (a, Direction.D) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.U] = (b, Direction.R) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.L] = (a, Direction.D) if carte[a].type == "." else None
 
         # B
         a = Position(i+1, width+1)
         b = Position(3*width-i, 1)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.U] = (b, Direction.D) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.U] = (a, Direction.D) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.U] = (b, Direction.D) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.U] = (a, Direction.D) if carte[a].type == "." else None
 
         # C
         a = Position(3*width+1+i, 2*width+1)
         b = Position(3*width, 2*width-i)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.U] = (b, Direction.L) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.R] = (a, Direction.D) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.U] = (b, Direction.L) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.R] = (a, Direction.D) if carte[a].type == "." else None
 
         # D
         a = Position(3*width, width-i)
         b = Position(4*width, 2*width+1+i)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.R] = (b, Direction.L) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.L] = (a, Direction.R) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.R] = (b, Direction.L) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.L] = (a, Direction.R) if carte[a].type == "." else None
 
         # E
         a = Position(2*width-i, 2*width)
         b = Position(2*width+1, 2*width+1+i)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.D] = (b, Direction.R) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.L] = (a, Direction.U) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.D] = (b, Direction.R) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.L] = (a, Direction.U) if carte[a].type == "." else None
 
         # F
         a = Position(1*width-i, 2*width)
         b = Position(2*width+1+i, 3*width)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.U] = (b, Direction.D) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.D] = (a, Direction.U) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.U] = (b, Direction.D) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.D] = (a, Direction.U) if carte[a].type == "." else None
 
         # G
         a = Position(1, 2*width-i)
         b = Position(3*width+1+i, 3*width)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.L] = (b, Direction.U) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.D] = (a, Direction.R) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.L] = (b, Direction.U) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.D] = (a, Direction.R) if carte[a].type == "." else None
 
     return carte
 
@@ -238,58 +244,58 @@ def wrap_data(carte: Carte) -> Carte:
         # A
         a = Position(2*width-i, 3*width)
         b = Position(1*width, 4*width-i)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.D] = (b, Direction.L) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.R] = (a, Direction.U) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.D] = (b, Direction.L) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.R] = (a, Direction.U) if carte[a].type == "." else None
 
         # B
         a = Position(0*width+1+i, 2*width+1)
         b = Position(1*width+1, 1*width+1+i)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.U] = (b, Direction.R) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.L] = (a, Direction.D) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.U] = (b, Direction.R) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.L] = (a, Direction.D) if carte[a].type == "." else None
 
         # C
         a = Position(0*width+1, 3*width-i)
         b = Position(1*width+1, 0*width+1+i)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.L] = (b, Direction.R) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.L] = (a, Direction.R) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.L] = (b, Direction.R) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.L] = (a, Direction.R) if carte[a].type == "." else None
 
         # D
         a = Position(0*width+1, 4*width-i)
         b = Position(2*width-i, 0*width+1)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.L] = (b, Direction.D) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.U] = (a, Direction.R) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.L] = (b, Direction.D) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.U] = (a, Direction.R) if carte[a].type == "." else None
 
         # E
         a = Position(1*width-i, 4*width)
         b = Position(3*width-i, 0*width+1)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.D] = (b, Direction.D) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.U] = (a, Direction.U) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.D] = (b, Direction.D) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.U] = (a, Direction.U) if carte[a].type == "." else None
 
         # F
         a = Position(2*width, 2*width+1+i)
         b = Position(3*width, 1*width-i)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.R] = (b, Direction.L) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.R] = (a, Direction.L) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.R] = (b, Direction.L) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.R] = (a, Direction.L) if carte[a].type == "." else None
 
         # G
         a = Position(2*width, 1*width+1+i)
         b = Position(2*width+1+i, 1*width)
-        if carte[a].type != "#":
-            carte[a].neighbors[Direction.R] = (b, Direction.U) if carte[b].type != "#" else None
-        if carte[b].type != "#":
-            carte[b].neighbors[Direction.D] = (a, Direction.L) if carte[a].type != "#" else None
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.R] = (b, Direction.U) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.D] = (a, Direction.L) if carte[a].type == "." else None
 
     return carte
 
@@ -305,10 +311,10 @@ def part2(data: str="data") -> int:
         carte = wrap_test(carte)
     else:
         carte = wrap_data(carte)
-    if False:
+    if True:
         print(*carte.items(), sep="\n")
-        print(instructions)
-        print(position)
+        print(*instructions, sep="\n")
+        print("start position:", position)
 
     return solve(carte, position, instructions)
 
@@ -329,3 +335,4 @@ if __name__ == "__main__":
     print(f"Part2 answer: {answer}")
     assert answer == 205615  # too high
     # 64384  to low
+    # Wrong 119103
