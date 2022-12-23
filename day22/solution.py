@@ -235,8 +235,12 @@ def wrap_test(carte: Carte) -> Carte:
 
 
 
-def wrap_data(carte: Carte) -> Carte:
+def wrap_data_a(carte: Carte) -> Carte:
     """
+     AB
+     C
+    DE
+    F
     """
     width = max(map(attrgetter("x"), carte.keys())) // 3
     assert width == 50
@@ -301,6 +305,77 @@ def wrap_data(carte: Carte) -> Carte:
 
 
 
+def wrap_data(carte: Carte) -> Carte:
+    """
+     AB
+     C
+    DE
+    F
+    """
+    print("NEW wrap_data()")
+    width = max(map(attrgetter("x"), carte.keys())) // 3
+    assert width == 50
+    for i in range(width):
+        # Bv & C>
+        a = Position(2*width+1+i, 1*width)
+        b = Position(2*width, 1*width+1+i)
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.D] = (b, Direction.L) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.R] = (a, Direction.U) if carte[a].type == "." else None
+
+        # C< & D^
+        a = Position(1*width+1, 2*width-i)
+        b = Position(1*width-i, 2*width+1)
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.L] = (b, Direction.D) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.U] = (a, Direction.R) if carte[a].type == "." else None
+
+        # Ev & F>
+        a = Position(1*width+1+i, 3*width)
+        b = Position(1*width, 3*width+1+i)
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.D] = (b, Direction.L) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.R] = (a, Direction.U) if carte[a].type == "." else None
+
+        # A< & D<
+        a = Position(1*width+1, 1*width-i)
+        b = Position(0*width+1, 2*width+1+i)
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.L] = (b, Direction.R) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.L] = (a, Direction.R) if carte[a].type == "." else None
+
+        # B> & E>
+        a = Position(3*width, 1*width-i)
+        b = Position(2*width, 2*width+1+i)
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.R] = (b, Direction.L) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.R] = (a, Direction.L) if carte[a].type == "." else None
+
+        # A^ & F<
+        a = Position(1*width+1+i, 0*width+1)
+        b = Position(0*width+1, 3*width+1+i)
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.U] = (b, Direction.R) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.L] = (a, Direction.D) if carte[a].type == "." else None
+
+        # B^ & Fv
+        a = Position(2*width+1+i, 0*width+1)
+        b = Position(0*width+1+i, 4*width)
+        if carte[a].type == ".":
+            carte[a].neighbors[Direction.U] = (b, Direction.U) if carte[b].type == "." else None
+        if carte[b].type == ".":
+            carte[b].neighbors[Direction.D] = (a, Direction.D) if carte[a].type == "." else None
+
+    return carte
+
+
+
 def part2(data: str="data") -> int:
     """
     Fold the map into a cube, then follow the path given in the monkeys' notes. What is the final password?
@@ -311,7 +386,7 @@ def part2(data: str="data") -> int:
         carte = wrap_test(carte)
     else:
         carte = wrap_data(carte)
-    if True:
+    if False:
         print(*carte.items(), sep="\n")
         print(*instructions, sep="\n")
         print("start position:", position)
@@ -336,3 +411,4 @@ if __name__ == "__main__":
     assert answer == 205615  # too high
     # 64384  to low
     # Wrong 119103
+    # Wrong 188168
