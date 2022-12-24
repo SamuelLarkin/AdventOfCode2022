@@ -34,6 +34,8 @@ DIRECTIONS = {
         ">": Position(1, 0),
         "DONT_MOVE": Position(0, 0),
         }
+DIRECTION2SYMBOL = {v: k for k, v in DIRECTIONS.items()}
+assert len(DIRECTIONS) == len(DIRECTION2SYMBOL)
 
 
 
@@ -51,7 +53,7 @@ def parser(data: str="data"):
     with open(data, mode="r", encoding="UTF8") as fin:
         fin = iter(map(str.strip, fin))
         line = next(fin)
-        width = len(line) - 1
+        width = len(line) - 2
         start = Position(0, -1)
         for y, line in enumerate(fin):
             if line.startswith("##"):
@@ -62,8 +64,12 @@ def parser(data: str="data"):
                     continue
                 blizzards.append(Blizzard(Position(x, y), DIRECTIONS[v]))
 
-    height = y - 1
+    height = y
     end = Position(width-1, height)
+
+    assert all(0 <= blizzard.position.x < width  for blizzard in blizzards)
+    assert all(0 <= blizzard.position.y < height for blizzard in blizzards)
+
     return start, end, (width, height), blizzards
 
 
@@ -100,8 +106,10 @@ class State(NamedTuple):
     def __lt__(self, other) -> bool:
         """
         """
+        return self.distance_to_end < self.distance_to_end
+        #return self.score < other.score
         #return self.score < other.score and self.step < other.step
-        return self.step < other.step and self.score < other.score
+        #return self.step < other.step and self.score < other.score
 
 
 
@@ -112,63 +120,106 @@ def distance(a: Position, b: Position) -> int:
 
 
 
+def display_valley(blizzards: Sequence[Blizzard], width: int, height: int):
+    """
+    """
+    assert all(0 <= blizzard.position.x < width  for blizzard in blizzards)
+    assert all(0 <= blizzard.position.y < height for blizzard in blizzards)
+
+    blizzards = { blizzard.position: blizzard for blizzard in blizzards }
+    for y in range(height):
+        for x in range(width):
+            p = Position(x, y)
+            if p in blizzards:
+                print(DIRECTION2SYMBOL[blizzards[p].direction], sep="", end="")
+            else:
+                print(".", sep="", end="")
+        print()
+
+
+
+def test_move_blizzards():
+    """
+    """
+    start, end, (width, height), blizzards = parser("test")
+    for i in range(18):
+        print(f"Step {i}")
+        display_valley(blizzards, width, height)
+        print()
+        blizzards = list(move_blizzards(blizzards, width, height))
+
+
+
 def part1(data: str="data") -> int:
     """
     What is the fewest number of minutes required to avoid the blizzards and reach the goal?
     """
     start, end, (width, height), blizzards = parser(data)
+    num_blizzards = len(blizzards)
+
+    # Get out of the starting position
+    step = 0
+    position = start + Position(0, 1)
+    while True:
+        blizzards = list(move_blizzards(blizzards, width, height))
+        step += 1
+        if position not in set(map(attrgetter("position"), blizzards)):
+            break
+
     states = [State(
-        step=0,
-        position=start,
-        distance_to_end=distance(start, end),
+        step=step,
+        position=position,
+        distance_to_end=distance(position, end),
         blizzards=blizzards,
         )]
     while len(states) > 0:
-        #heapq.heapify(states)
         state = heapq.heappop(states)
-        print(len(states), state.score)
+        print(f"#States: {len(states)}, State: {state}")
 
         if state.distance_to_end == 0:
             return state.step
         if state.position == end:
             return state.step
-        #if state.position in set(map(attrgetter("position"), blizzards)):
-        #    # We accidentally moved into a blizzard, skip it.
-        #    continue
 
+        # We accidentally moved into a blizzard, skip it.
+        assert state.position not in set(map(attrgetter("position"), state.blizzards))
 
-        blizzards = list(move_blizzards(blizzards, width, height))
+        blizzards = list(move_blizzards(state.blizzards, width, height))
+        assert len(blizzards) == num_blizzards
+        forbidden_positions = set(map(attrgetter("position"), blizzards))
 
         for position in map(lambda d: state.position+d, DIRECTIONS.values()):
             if position == end:
-                assert False
+                return state.step + 1
             if 0 <= position.x < width and 0 <= position.y < height:
                 # We are still in the valley.
-                if position not in set(map(attrgetter("position"), blizzards)):
+                if position not in forbidden_positions:
                     # There is no blizzard there.
                     heapq.heappush(
                             states,
                             State(
                                 step=state.step+1,
-                                position=position,
+                                position=Position(position.x, position.y),
                                 distance_to_end=distance(position, end),
-                                blizzards=blizzards,
+                                blizzards=list(blizzards),
                                 ))
 
-    return 0
+    return None
 
 
 
 def part2(data: str="data") -> int:
     """
     """
-    return 0
+    return None
 
 
 
 
 
 if __name__ == "__main__":
+    #test_move_blizzards()
+
     assert (answer := part1("test")) == 18, answer
     answer = part1()
     print(f"Part1 answer: {answer}")
