@@ -112,10 +112,7 @@ class State(NamedTuple):
     def __lt__(self, other) -> bool:
         """
         """
-        return self.distance_to_end < self.distance_to_end
-        #return self.score < other.score
-        #return self.score < other.score and self.step < other.step
-        #return self.step < other.step and self.score < other.score
+        return self.distance_to_end < self.distance_to_end and self.step < other.step
 
 
 
@@ -161,8 +158,9 @@ def part1(data: str="data") -> int:
     What is the fewest number of minutes required to avoid the blizzards and reach the goal?
     """
     start, end, (width, height), blizzards = parser(data)
+    modulo = width * height // math.gcd(width, height)
     all_blizzard_setup = []
-    for _ in range(width*height):
+    for _ in range(modulo):
         all_blizzard_setup.append(blizzards)
         blizzards = tuple(move_blizzards(blizzards, width, height))
     all_forbidden_positions = [set(map(attrgetter("position"), blizzards)) for blizzards in all_blizzard_setup]
@@ -172,7 +170,7 @@ def part1(data: str="data") -> int:
     position = start + Position(0, 1)
     while True:
         step += 1
-        blizzard_set_id = step % (width*height)
+        blizzard_set_id = step % modulo
         blizzards = all_blizzard_setup[blizzard_set_id]
         if position not in all_forbidden_positions[blizzard_set_id]:
             break
@@ -192,7 +190,7 @@ def part1(data: str="data") -> int:
         if state.position == end:
             return state.step
 
-        blizzard_set_id = state.step % (width*height)
+        blizzard_set_id = state.step % modulo
         if state.step < best[(state.position, blizzard_set_id)]:
             best[(state.position, blizzard_set_id)] = state.step
         else:
@@ -200,7 +198,7 @@ def part1(data: str="data") -> int:
             continue
 
         # We accidentally moved into a blizzard, skip it.
-        #assert state.position not in all_forbidden_positions[state.step % (width*height)]
+        #assert state.position not in all_forbidden_positions[blizzard_set_id]
 
         blizzards = all_blizzard_setup[blizzard_set_id]
         forbidden_positions = all_forbidden_positions[blizzard_set_id]
@@ -208,6 +206,12 @@ def part1(data: str="data") -> int:
         for position in map(lambda d: state.position+d, DIRECTIONS.values()):
             if position == end:
                 return state.step
+                #yield State(
+                #    step=state.step+1,
+                #    position=Position(position.x, position.y),
+                #    distance_to_end=distance(position, end),
+                #    )
+                
             if 0 <= position.x < width and 0 <= position.y < height:
                 # We are still in the valley.
                 if position not in forbidden_positions:
