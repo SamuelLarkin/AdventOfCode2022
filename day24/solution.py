@@ -1,5 +1,6 @@
 #!/usr/bin/env  python3
 
+from collections import defaultdict
 from dataclasses import dataclass
 from operator import attrgetter
 from typing import (
@@ -14,6 +15,13 @@ from typing import (
         )
 
 import heapq
+import math
+
+
+
+StepNumber = int
+Distance = int
+BlizzardSetId = int
 
 
 
@@ -39,8 +47,7 @@ assert len(DIRECTIONS) == len(DIRECTION2SYMBOL)
 
 
 
-@dataclass
-class Blizzard:
+class Blizzard(NamedTuple):
     position: Position
     direction: Position
 
@@ -70,7 +77,7 @@ def parser(data: str="data"):
     assert all(0 <= blizzard.position.x < width  for blizzard in blizzards)
     assert all(0 <= blizzard.position.y < height for blizzard in blizzards)
 
-    return start, end, (width, height), blizzards
+    return start, end, (width, height), tuple(blizzards)
 
 
 
@@ -91,10 +98,9 @@ def move_blizzards(
 
 
 class State(NamedTuple):
-    step: int   # Number of step so far
+    step: StepNumber   # Number of step so far
     position: Position
-    distance_to_end: int
-    blizzards: List[Blizzard]
+    distance_to_end: Distance
 
     @property
     def score(self) -> int:
@@ -113,7 +119,7 @@ class State(NamedTuple):
 
 
 
-def distance(a: Position, b: Position) -> int:
+def distance(a: Position, b: Position) -> Distance:
     """
     """
     return abs(a.x-b.x) + abs(a.y-b.y)
@@ -155,22 +161,27 @@ def part1(data: str="data") -> int:
     What is the fewest number of minutes required to avoid the blizzards and reach the goal?
     """
     start, end, (width, height), blizzards = parser(data)
-    num_blizzards = len(blizzards)
+    all_blizzard_setup = []
+    for _ in range(width*height):
+        all_blizzard_setup.append(blizzards)
+        blizzards = tuple(move_blizzards(blizzards, width, height))
+    all_forbidden_positions = [set(map(attrgetter("position"), blizzards)) for blizzards in all_blizzard_setup]
 
     # Get out of the starting position
     step = 0
     position = start + Position(0, 1)
     while True:
-        blizzards = list(move_blizzards(blizzards, width, height))
         step += 1
-        if position not in set(map(attrgetter("position"), blizzards)):
+        blizzard_set_id = step % (width*height)
+        blizzards = all_blizzard_setup[blizzard_set_id]
+        if position not in all_forbidden_positions[blizzard_set_id]:
             break
 
+    best: Dict[Tuble[Position, BlizzardSetId], StepNumber] = defaultdict(lambda: math.inf)
     states = [State(
         step=step,
         position=position,
         distance_to_end=distance(position, end),
-        blizzards=blizzards,
         )]
     while len(states) > 0:
         state = heapq.heappop(states)
@@ -181,16 +192,22 @@ def part1(data: str="data") -> int:
         if state.position == end:
             return state.step
 
-        # We accidentally moved into a blizzard, skip it.
-        assert state.position not in set(map(attrgetter("position"), state.blizzards))
+        blizzard_set_id = state.step % (width*height)
+        if state.step < best[(state.position, blizzard_set_id)]:
+            best[(state.position, blizzard_set_id)] = state.step
+        else:
+            # We previously arrived here earlier.
+            continue
 
-        blizzards = list(move_blizzards(state.blizzards, width, height))
-        assert len(blizzards) == num_blizzards
-        forbidden_positions = set(map(attrgetter("position"), blizzards))
+        # We accidentally moved into a blizzard, skip it.
+        #assert state.position not in all_forbidden_positions[state.step % (width*height)]
+
+        blizzards = all_blizzard_setup[blizzard_set_id]
+        forbidden_positions = all_forbidden_positions[blizzard_set_id]
 
         for position in map(lambda d: state.position+d, DIRECTIONS.values()):
             if position == end:
-                return state.step + 1
+                return state.step
             if 0 <= position.x < width and 0 <= position.y < height:
                 # We are still in the valley.
                 if position not in forbidden_positions:
@@ -201,7 +218,6 @@ def part1(data: str="data") -> int:
                                 step=state.step+1,
                                 position=Position(position.x, position.y),
                                 distance_to_end=distance(position, end),
-                                blizzards=list(blizzards),
                                 ))
 
     return None
@@ -224,6 +240,7 @@ if __name__ == "__main__":
     answer = part1()
     print(f"Part1 answer: {answer}")
     assert answer == 69289
+    # 1092 too high
 
     assert (answer := part2("test")) == 301, answer
     answer = part2()
