@@ -164,6 +164,7 @@ def part1(data: str="data") -> int:
 
     all_allowed_positions = []
     all_positions = frozenset(Position(x, y) for x, y in product(range(width), range(height)))
+    all_positions = frozenset(all_positions | {start, end})
     for _ in trange(modulo, desc="Caching valid positions"):
         allowed_positions = frozenset(all_positions - set(map(attrgetter("position"), blizzards)))
         all_allowed_positions.append(allowed_positions)
@@ -190,8 +191,6 @@ def part1(data: str="data") -> int:
 
         if state.distance_to_end == 0:
             return state.step
-        if state.position == end:
-            return state.step
 
         blizzard_set_id = state.step % modulo
         if state.step < best[(state.position, blizzard_set_id)]:
@@ -209,15 +208,6 @@ def part1(data: str="data") -> int:
         allowed_positions = all_allowed_positions[blizzard_set_id]
 
         for position in map(lambda d: state.position+d, DIRECTIONS.values()):
-            if position == end:
-                return step
-                #yield State(
-                #    step=step,
-                #    position=Position(position.x, position.y),
-                #    distance_to_end=distance(position, end),
-                #    )
-                #break
-                
             if position in allowed_positions:
                 # There is no blizzard there.
                 next_state = State(
