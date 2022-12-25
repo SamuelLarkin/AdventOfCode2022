@@ -2,7 +2,9 @@
 
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import product
 from operator import attrgetter
+from tqdm import trange
 from typing import (
         Callable,
         Generator,
@@ -159,12 +161,13 @@ def part1(data: str="data") -> int:
     """
     start, end, (width, height), blizzards = parser(data)
     modulo = width * height // math.gcd(width, height)
-    all_blizzard_setup = []
-    for _ in range(modulo):
-        all_blizzard_setup.append(blizzards)
+
+    all_allowed_positions = []
+    all_positions = frozenset(Position(x, y) for x, y in product(range(width), range(height)))
+    for _ in trange(modulo, desc="Caching valid positions"):
+        allowed_positions = frozenset(all_positions - set(map(attrgetter("position"), blizzards)))
+        all_allowed_positions.append(allowed_positions)
         blizzards = tuple(move_blizzards(blizzards, width, height))
-    all_forbidden_positions = [set(map(attrgetter("position"), blizzards)) for blizzards in all_blizzard_setup]
-    assert len(set(all_blizzard_setup)) == modulo
 
     # Get out of the starting position
     step = 0
@@ -172,8 +175,7 @@ def part1(data: str="data") -> int:
     while True:
         step += 1
         blizzard_set_id = step % modulo
-        blizzards = all_blizzard_setup[blizzard_set_id]
-        if position not in all_forbidden_positions[blizzard_set_id]:
+        if position in all_allowed_positions[blizzard_set_id]:
             break
 
     best: Dict[Tuble[Position, BlizzardSetId], StepNumber] = defaultdict(lambda: math.inf)
@@ -184,7 +186,7 @@ def part1(data: str="data") -> int:
         )]
     while len(states) > 0:
         state = heapq.heappop(states)
-        print(f"#States: {len(states)}, State: {state}")
+        #print(f"#States: {len(states)}, State: {state}")
 
         if state.distance_to_end == 0:
             return state.step
@@ -199,12 +201,11 @@ def part1(data: str="data") -> int:
             continue
 
         # We accidentally moved into a blizzard, skip it.
-        assert state.position not in all_forbidden_positions[blizzard_set_id]
+        assert state.position in all_allowed_positions[blizzard_set_id]
 
         # Checking next step
         blizzard_set_id = (state.step + 1) % modulo
-        blizzards = all_blizzard_setup[blizzard_set_id]
-        forbidden_positions = all_forbidden_positions[blizzard_set_id]
+        allowed_positions = all_allowed_positions[blizzard_set_id]
 
         for position in map(lambda d: state.position+d, DIRECTIONS.values()):
             if position == end:
@@ -214,16 +215,18 @@ def part1(data: str="data") -> int:
                 #    position=Position(position.x, position.y),
                 #    distance_to_end=distance(position, end),
                 #    )
+                #break
                 
             if 0 <= position.x < width and 0 <= position.y < height:
                 # We are still in the valley.
-                if position not in forbidden_positions:
+                if position in allowed_positions:
                     # There is no blizzard there.
                     heapq.heappush(
                             states,
                             State(
                                 step=state.step+1,
-                                position=Position(position.x, position.y),
+                                #position=Position(position.x, position.y),
+                                position=position,
                                 distance_to_end=distance(position, end),
                                 ))
 
@@ -242,6 +245,7 @@ def part2(data: str="data") -> int:
 
 if __name__ == "__main__":
     #test_move_blizzards()
+    #print(*part1(), sep="\n")
 
     assert (answer := part1("test")) == 18, answer
     answer = part1()
