@@ -247,8 +247,7 @@ if __name__ == "__main__":
     assert (answer := part1("test")) == 18, answer
     answer = part1()
     print(f"Part1 answer: {answer}")
-    assert answer == 69289
-    # 1092 too high
+    assert answer == 288
 
     assert (answer := part2("test")) == 301, answer
     answer = part2()
