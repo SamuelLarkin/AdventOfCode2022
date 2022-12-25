@@ -164,6 +164,7 @@ def part1(data: str="data") -> int:
         all_blizzard_setup.append(blizzards)
         blizzards = tuple(move_blizzards(blizzards, width, height))
     all_forbidden_positions = [set(map(attrgetter("position"), blizzards)) for blizzards in all_blizzard_setup]
+    assert len(set(all_blizzard_setup)) == modulo
 
     # Get out of the starting position
     step = 0
@@ -198,14 +199,16 @@ def part1(data: str="data") -> int:
             continue
 
         # We accidentally moved into a blizzard, skip it.
-        #assert state.position not in all_forbidden_positions[blizzard_set_id]
+        assert state.position not in all_forbidden_positions[blizzard_set_id]
 
+        # Checking next step
+        blizzard_set_id = (state.step + 1) % modulo
         blizzards = all_blizzard_setup[blizzard_set_id]
         forbidden_positions = all_forbidden_positions[blizzard_set_id]
 
         for position in map(lambda d: state.position+d, DIRECTIONS.values()):
             if position == end:
-                return state.step
+                return state.step + 1
                 #yield State(
                 #    step=state.step+1,
                 #    position=Position(position.x, position.y),
