@@ -204,31 +204,28 @@ def part1(data: str="data") -> int:
         assert state.position in all_allowed_positions[blizzard_set_id]
 
         # Checking next step
-        blizzard_set_id = (state.step + 1) % modulo
+        step = state.step + 1
+        blizzard_set_id = step % modulo
         allowed_positions = all_allowed_positions[blizzard_set_id]
 
         for position in map(lambda d: state.position+d, DIRECTIONS.values()):
             if position == end:
-                return state.step + 1
+                return step
                 #yield State(
-                #    step=state.step+1,
+                #    step=step,
                 #    position=Position(position.x, position.y),
                 #    distance_to_end=distance(position, end),
                 #    )
                 #break
                 
-            if 0 <= position.x < width and 0 <= position.y < height:
-                # We are still in the valley.
-                if position in allowed_positions:
-                    # There is no blizzard there.
-                    heapq.heappush(
-                            states,
-                            State(
-                                step=state.step+1,
-                                #position=Position(position.x, position.y),
-                                position=position,
-                                distance_to_end=distance(position, end),
-                                ))
+            if position in allowed_positions:
+                # There is no blizzard there.
+                next_state = State(
+                        step=step,
+                        position=position,
+                        distance_to_end=distance(position, end),
+                        )
+                heapq.heappush(states, next_state)
 
     return None
 
