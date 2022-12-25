@@ -114,7 +114,7 @@ class State(NamedTuple):
     def __lt__(self, other) -> bool:
         """
         """
-        return self.distance_to_end < self.distance_to_end and self.step < other.step
+        return self.score < other.score
 
 
 
@@ -233,6 +233,7 @@ def part1(data: str="data") -> int:
 
 def part2(data: str="data") -> int:
     """
+    What is the fewest number of minutes required to reach the goal, go back to the start, then reach the goal again?
     """
     return None
 
@@ -249,7 +250,9 @@ if __name__ == "__main__":
     print(f"Part1 answer: {answer}")
     assert answer == 288
 
-    assert (answer := part2("test")) == 301, answer
+    print()
+
+    assert (answer := part2("test")) == 54, answer
     answer = part2()
     print(f"Part2 answer: {answer}")
     assert answer == 205615
