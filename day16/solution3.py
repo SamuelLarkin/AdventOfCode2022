@@ -47,6 +47,7 @@ def parser(data: str="data") -> nx.Graph:
             leads = map(str.strip, m.group("lead").split(","))
             for destination in leads:
                 G.add_edge(valve, destination, time=1)
+            G.nodes[valve]["name"] = valve
             G.nodes[valve]["flow"] = flow
 
     if False:
@@ -246,20 +247,21 @@ def part2(data: str="data") -> int:
                         remaining_minutes=remaining_minutes,
                         opened_valves=current.opened_valves + next_valve,
                         )
+            assert possible_valve.opened_valves <= all_valves
             if possible_valve.score > best[possible_valve.opened_valves]:
                 best[possible_valve.opened_valves] = possible_valve.score
                 heapq.heappush(states, possible_valve)
 
 
-    if True:
+    if False:
         #print(*((sorted(a), b) for a, b in best.items()), sep="\n")
-        print(*best.items(), sep="\n")
+        print(*sorted(best.items(), key=itemgetter(0)), sep="\n")
         print(len(best))
     answer = max(
             me_score + elephant_score
             for me, me_score in best.items()
             for elephant, elephant_score in best.items()
-            if not (me & elephant)
+            if not ((me-start) & (elephant-start))
             )
     return answer
 
@@ -271,11 +273,11 @@ if __name__ == "__main__":
     assert (answer := part1("test")) == 1651, answer
     answer = part1()
     print(f"Part1 answer: {answer}")
-    assert answer == 2124
+    assert answer == 2124, answer
 
     print()
 
     #assert (answer := part2("test")) == 1707, answer
     answer = part2()
     print(f"Part2 answer: {answer}")
-    assert answer == 2775
+    assert answer == 2775, answer
