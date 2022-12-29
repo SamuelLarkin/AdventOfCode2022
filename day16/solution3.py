@@ -242,8 +242,9 @@ def part2(data: str="data") -> int:
                 heapq.heappush(states, possible_valve)
 
 
-    print(*best.items(), sep="\n")
-    print(len(best))
+    if False:
+        print(*((sorted(a), b) for a, b in best.items()), sep="\n")
+        print(len(best))
     answer = max(
             me_score + elephant_score
             for me, me_score in best.items()
@@ -264,7 +265,7 @@ if __name__ == "__main__":
 
     print()
 
-    assert (answer := part2("test")) == 1707, answer
+    #assert (answer := part2("test")) == 1707, answer
     answer = part2()
     print(f"Part2 answer: {answer}")
-    assert answer == 205615
+    assert answer == 2775
