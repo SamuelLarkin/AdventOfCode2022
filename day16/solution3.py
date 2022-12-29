@@ -57,20 +57,24 @@ def parser(data: str="data") -> nx.Graph:
 
     # Remove node that can't contribute to the flow.
     nodes_with_flow = list(filter(lambda n: n[1]["flow"] > 0 or n[0]=="AA", G.nodes(data=True)))
+    rename = {k: 1<<v for v, k in enumerate(sorted(map(itemgetter(0), nodes_with_flow))) }
 
     # Create a fully connected graph of nodes with flow.
     # This is analoguous to going from A -> B -> C but without opening the valve at B.
     G2 = nx.Graph()
     for (u, ud), (v, vd) in combinations(nodes_with_flow, 2):
-        G2.add_node(u, **ud)
-        G2.add_node(v, **vd)
         # -1 because the path includes the first AND last node but we care
         # about the number of edges, not the number of nodes.
         # +1 because we add the time it takes to open the valve.  If we go to
         # node X, it is because we want to open valve X.
-        G2.add_edge(u, v, time=len(nx.shortest_path(G, u, v))-1+1)
+        travel_time = len(nx.shortest_path(G, u, v))-1+1
+        u = rename[u]
+        v = rename[v]
+        G2.add_node(u, **ud)
+        G2.add_node(v, **vd)
+        G2.add_edge(u, v, time=travel_time)
 
-    return G2
+    return G2, rename[START]
 
 
 
@@ -79,10 +83,10 @@ class State(NamedTuple):
     """
     # Order of attributes matters to properly order the heapq.
     valve: str
-    score: int
-    future_score: int
     remaining_minutes: int
-    remaining_valves: Set[str]=frozenset()
+    score: int=0
+    future_score: int=0
+    opened_valves: int=0
 
     @property
     def expected_score(self) -> int:
@@ -100,7 +104,7 @@ class State(NamedTuple):
 def compute_future_score(
         G: nx.Graph,
         valve: str,
-        remaining_valves: Iterable[str],
+        remaining_valves: int,
         remaining_minutes: int,
         ):
     """
@@ -108,12 +112,13 @@ def compute_future_score(
     What if we could simultaneously open all remaining valves for the rest of the remaining minutes?
     """
     future_score = 0
-    for next_valve in remaining_valves:
-        if valve == next_valve:
-            travel_time = 0
-        else:
-            travel_time = G[valve][next_valve]["time"]
-        future_score += G.nodes[next_valve]["flow"] * max(0, remaining_minutes-travel_time)
+    for next_valve in G.nodes:
+        if next_valve & remaining_valves:
+            if valve == next_valve:
+                travel_time = 0
+            else:
+                travel_time = G[valve][next_valve]["time"]
+            future_score += G.nodes[next_valve]["flow"] * max(0, remaining_minutes-travel_time)
 
     return future_score
 
@@ -124,7 +129,7 @@ def part1(data: str="data") -> int:
     What is the most pressure you can release?
     """
     MINUTES = 30
-    G = parser(data)
+    G, start = parser(data)
     if False:
         print(*G.nodes(data=True), sep="\n")
         print(*G.edges(data=True), sep="\n")
@@ -137,35 +142,36 @@ def part1(data: str="data") -> int:
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
         plt.savefig("cave.png")
 
+    all_valves = sum(G.nodes)
     best = defaultdict(lambda: 0)
-    remaining_valves = frozenset(G.nodes - {START})
     states = [State(
-        valve=START,
+        valve=start,
         score=0,
-        future_score=compute_future_score(G, START, remaining_valves, MINUTES),
+        future_score=compute_future_score(G, start, all_valves-start, MINUTES),
         remaining_minutes=MINUTES,
-        remaining_valves=remaining_valves,
+        opened_valves=start,
         )]
 
     while len(states) > 0:
         current = heapq.heappop(states)
 
-        if current.remaining_minutes <= 0 or len(current.remaining_valves) == 0:
+        if current.remaining_minutes <= 0 or current.opened_valves == all_valves:
             #print(current)
             #print(len(states))
             #print(*sorted(states, key=attrgetter("score"), reverse=True), sep="\n")
             return current.score
 
-        for next_valve in current.remaining_valves:
+        for next_valve in G.nodes:
+            if next_valve & current.opened_valves:
+                continue
             assert current.valve != next_valve, current.valve
 
             # Moving to the next valve and open it.
             flow = G.nodes[next_valve]["flow"]
-            remaining_valves = frozenset(current.remaining_valves - {next_valve})
             travel_time = G[current.valve][next_valve]["time"]
             if current.remaining_minutes > travel_time:
                 remaining_minutes = current.remaining_minutes - travel_time
-                future_score = compute_future_score(G, next_valve, remaining_valves, remaining_minutes)
+                future_score = compute_future_score(G, next_valve, all_valves-next_valve, remaining_minutes)
             else:
                 future_score = 0
                 remaining_minutes = 0
@@ -175,10 +181,10 @@ def part1(data: str="data") -> int:
                         score=current.score + remaining_minutes*flow,
                         future_score=future_score,
                         remaining_minutes=remaining_minutes,
-                        remaining_valves=remaining_valves,
+                        opened_valves=current.opened_valves+next_valve,
                         )
-            if possible_valve.score > best[possible_valve.remaining_valves]:
-                best[possible_valve.remaining_valves] = possible_valve.score
+            if possible_valve.score > best[possible_valve.opened_valves]:
+                best[possible_valve.opened_valves] = possible_valve.score
                 heapq.heappush(states, possible_valve)
 
 
@@ -199,28 +205,31 @@ def part2(data: str="data") -> int:
         """
         # Order of attributes matters to properly order the heapq.
         valve: str
-        score: int
         remaining_minutes: int
-        opened_valves: Set[str]=frozenset()
+        score: int=0
+        opened_valves: int=0
 
     MINUTES = 26
-    G = parser(data)
+    G, start = parser(data)
 
+    all_valves = sum(G.nodes)
     best = defaultdict(lambda: 0)
     states = [State(
-        valve=START,
+        valve=start,
         score=0,
         remaining_minutes=MINUTES,
-        opened_valves=frozenset(),
+        opened_valves=start,
         )]
 
     while len(states) > 0:
         current = heapq.heappop(states)
 
-        if current.remaining_minutes <= 0 or current.opened_valves == set(G.nodes):
+        if current.remaining_minutes <= 0 or current.opened_valves == all_valves:
             continue
 
-        for next_valve in set(G.nodes) - {START} - current.opened_valves:
+        for next_valve in G.nodes:
+            if next_valve & current.opened_valves:
+                continue
             assert current.valve != next_valve, current.valve
 
             # Moving to the next valve and open it.
@@ -235,15 +244,16 @@ def part2(data: str="data") -> int:
                         valve=next_valve,
                         score=current.score + remaining_minutes*flow,
                         remaining_minutes=remaining_minutes,
-                        opened_valves=frozenset(current.opened_valves | {next_valve}),
+                        opened_valves=current.opened_valves + next_valve,
                         )
             if possible_valve.score > best[possible_valve.opened_valves]:
                 best[possible_valve.opened_valves] = possible_valve.score
                 heapq.heappush(states, possible_valve)
 
 
-    if False:
-        print(*((sorted(a), b) for a, b in best.items()), sep="\n")
+    if True:
+        #print(*((sorted(a), b) for a, b in best.items()), sep="\n")
+        print(*best.items(), sep="\n")
         print(len(best))
     answer = max(
             me_score + elephant_score
