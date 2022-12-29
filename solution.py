@@ -22,14 +22,14 @@ def parser(data: str="data") -> Generator[, None, None]:
 
 
 
-def part1() -> int:
+def part1(data: str="data") -> int:
     """
     """
     return 0
 
 
 
-def part2() -> int:
+def part2(data: str="data") -> int:
     """
     """
     return 0
