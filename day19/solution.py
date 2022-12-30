@@ -1,5 +1,6 @@
 #!/usr/bin/env  python3
 
+from enum import Enum
 from itertools import product
 from typing import (
         Callable,
@@ -12,21 +13,27 @@ from typing import (
         Union,
         )
 
+import heapq
 import re
 
 
 
 MINUTES = 24
+class Robot(Enum):
+    geode=0
+    obsidian=1
+    clay=2
+    ore=3
 
 
 
 class Material(NamedTuple):
     """
     """
-    ore: int=0
-    clay: int=0
-    obsidian: int=0
     geode: int=0
+    obsidian: int=0
+    clay: int=0
+    ore: int=0
 
     def __add__(self, other: "Material") -> "Material":
         """
@@ -58,13 +65,13 @@ class Material(NamedTuple):
                 geode=factor*self.geode,
                 )
 
-    def __le__(self, other: "Material") -> bool:
+    def __ge__(self, other: "Material") -> bool:
         """
         """
-        return self.ore <= other.ore \
-                and self.clay <= other.clay \
-                and self.obsidian <= other.obsidian \
-                and self.geode <= other.geode
+        return self.ore >= other.ore \
+                and self.clay >= other.clay \
+                and self.obsidian >= other.obsidian \
+                and self.geode >= other.geode
 
 
 
@@ -72,15 +79,16 @@ class Blueprint(NamedTuple):
     """
     """
     bid: int
-    robot_ore: Material
-    robot_clay: Material
-    robot_obsidian: Material
-    robot_geode: Material
+    robots: List[Material]
 
 
 
 #Blueprint 10: Each ore robot costs 4 ore. Each clay robot costs 3 ore. Each obsidian robot costs 2 ore and 17 clay. Each geode robot costs 3 ore and 16 obsidian.
-blueprint_re = re.compile(r"^Blueprint (?P<blueprint_id>\d+): Each ore robot costs (?P<ore_robot_ore>\d+) ore. Each clay robot costs (?P<clay_robot_ore>\d+) ore. Each obsidian robot costs (?P<obsidian_robot_ore>\d+) ore and (?P<obsidian_robot_clay>\d+) clay. Each geode robot costs (?P<geode_robot_ore>\d+) ore and (?P<geode_robot_clay>\d+) obsidian.")
+blueprint_re = re.compile(r"^Blueprint (?P<blueprint_id>\d+): "
+                          r"Each ore robot costs (?P<ore_robot_ore>\d+) ore. "
+                          r"Each clay robot costs (?P<clay_robot_ore>\d+) ore. "
+                          r"Each obsidian robot costs (?P<obsidian_robot_ore>\d+) ore and (?P<obsidian_robot_clay>\d+) clay. "
+                          r"Each geode robot costs (?P<geode_robot_ore>\d+) ore and (?P<geode_robot_obsidian>\d+) obsidian.")
 def parser(data: str="data") -> Generator[Blueprint, None, None]:
     """
     """
@@ -90,96 +98,130 @@ def parser(data: str="data") -> Generator[Blueprint, None, None]:
             assert m is not None, line
             yield Blueprint(
                     bid = int(m.group("blueprint_id")),
-                    robot_ore = Material(ore=int(m.group("ore_robot_ore"))),
-                    robot_clay = Material(ore=int(m.group("clay_robot_ore"))),
-                    robot_obsidian = Material(
-                        ore = int(m.group("obsidian_robot_ore")),
-                        clay = int(m.group("obsidian_robot_clay")),
-                        ),
-                    robot_geode = Material(
-                        ore  = int(m.group("geode_robot_ore")),
-                        clay = int(m.group("geode_robot_clay")),
-                        ),
+                    robots = [
+                        Material(
+                            ore  = int(m.group("geode_robot_ore")),
+                            obsidian = int(m.group("geode_robot_obsidian")),
+                            ),
+                        Material(
+                            ore  = int(m.group("obsidian_robot_ore")),
+                            clay = int(m.group("obsidian_robot_clay")),
+                            ),
+                        Material(ore=int(m.group("clay_robot_ore"))),
+                        Material(ore=int(m.group("ore_robot_ore"))),
+                        ]
                     )
 
 
 
-def possible_robots(
-        blueprint: Blueprint,
-        material: Material,
-        ) -> Generator[Tuple, None, None]:
-    """
-    """
-    for r_geode, r_obsidian, r_clay, r_ore in product(range(3), repeat=4):
-        #if r_ore == 0 and r_clay == 0 and r_obsidian == 0 and r_geode == 0:
-        #    continue
-        cost = Material()
-        cost += blueprint.robot_ore * r_ore
-        cost += blueprint.robot_clay * r_clay
-        cost += blueprint.robot_obsidian * r_obsidian
-        cost += blueprint.robot_geode * r_geode
-        if cost <= material:
-            yield r_ore, r_clay, r_obsidian, r_geode
-
-
-
 class State(NamedTuple):
+    """
+    """
+    minutes: int   # Number of minutes left.
     material: Material=Material()
-    robot_ore: int=1
-    robot_clay: int=0
-    robot_obsidian: int=0
-    robot_geode: int=0
-    minutes: int=0
+    robots: List[int]=[0, 0, 0, 1]
+    next_robot: Robot=None
+    future_score: int=0
+
+    @property
+    def score(self) -> int:
+        """
+        """
+        return self.robots[Robot.geode.value] + self.future_score
+
+
+    def __lt__(self, other) -> bool:
+        """
+        """
+        return self.score > other.score
 
 
 
-def extract_geodes(blueprint: Blueprint, state: State=State()) -> int:
+def compute_future_score(num_geode_robots: int, minutes_left: int) -> int:
     """
     """
-    if state.minutes <= MINUTES:
-        # We have new material
-        state = state._replace(
-                material=Material(
-                    ore=state.material.ore+state.robot_ore,
-                    clay=state.material.clay+state.robot_clay,
-                    obsidian=state.material.obsidian+state.robot_obsidian,
-                    geode=state.material.geode+state.robot_geode,
-                    ),
-                minutes=state.minutes+1,
-                )
+    return num_geode_robots * minutes_left
 
-        # Start building robots
-        for r_ore, r_clay, r_obsidian, r_geode in possible_robots(blueprint, state.material):
-            material = state.material \
-                    - blueprint.robot_ore * r_ore \
-                    - blueprint.robot_clay * r_clay \
-                    - blueprint.robot_obsidian * r_obsidian \
-                    - blueprint.robot_geode * r_geode
+
+
+def extract_geodes(blueprint: Blueprint) -> int:
+    """
+    """
+    states = [ State(minutes=MINUTES) ]
+    while len(states) > 0:
+        print(len(states))
+        state = heapq.heappop(states)
+
+        if state.minutes <= 0:
+            return state.material.geode
+
+        if state.next_robot is None:
+            # Here we simply select the next robot to build.
+            for robot in Robot:
+                neww_state = state._replace(next_robot=robot)
+                new_state = State(
+                        minutes=state.minutes,
+                        material=state.material,
+                        robots=state.robots,
+                        next_robot=robot,
+                        future_score=state.future_score,
+                        )
+                heapq.heappush(states, new_state)
+        elif state.material >= blueprint.robots[state.next_robot.value]:
+            # Do we have enough material to build our next robot?
+            material = state.material - blueprint.robots[state.next_robot.value]
+            robots = [ v for v in state.robots ]
+            robots[state.next_robot.value] += 1
             new_state = State(
-                material=material,
-                robot_ore=state.robot_ore+r_ore,
-                robot_clay=state.robot_clay+r_clay,
-                robot_obsidian=state.robot_obsidian+r_obsidian,
-                robot_geode=state.robot_geode+r_geode,
-                minutes=state.minutes,
-                )
-            yield from extract_geodes(blueprint, new_state)
-    else:
-        yield state
+                    minutes=state.minutes,
+                    material=material,
+                    robots=robots,
+                    next_robot=None,
+                    future_score=compute_future_score(
+                        robots[Robot.geode.value],
+                        state.minutes,
+                        )
+                    )
+            heapq.heappush(states, new_state)
+        else:
+            # We simply collect the new material.
+            #material = Material(
+            #        ore=state.material[0]+state.robots[0],
+            #        clay=state.material[1]+state.robots[1],
+            #        obsidian=state.material[2]+state.robots[2],
+            #        geode=state.material[3]+state.robots[3],
+            #        )
+            material = Material(*[
+                c+n for c, n in zip(state.material, state.robots)
+                ])
+            minutes = state.minutes - 1
+            new_state = State(
+                    minutes=minutes,
+                    material=material,
+                    robots=state.robots,
+                    next_robot=state.next_robot,
+                    future_score=compute_future_score(
+                        state.robots[Robot.geode.value],
+                        minutes,
+                        )
+                    )
+            heapq.heappush(states, new_state)
+
+    return None
 
 
 
-def part1() -> int:
+def part1(data: str="data") -> int:
     """
     What do you get if you add up the quality level of all of the blueprints in your list?
     """
-    blueprints = list(parser("test"))
-    #blueprints = list(parser())
+    blueprints = list(parser(data))
+
     #print(*blueprints, sep="\n")
     for blueprint in blueprints:
         print(blueprint)
-        for state in extract_geodes(blueprint):
-            print(state)
+        num_geode = extract_geodes(blueprint)
+        print(num_geode)
 
     return None
 
@@ -195,10 +237,14 @@ def part2() -> int:
 
 
 if __name__ == "__main__":
+    assert (answer := part1("test")) == 9, answer
     answer = part1()
     print(f"Part1 answer: {answer}")
     assert answer == 69289
 
+    print()
+
+    assert (answer := part2("test")) == 152, answer
     answer = part2()
     print(f"Part2 answer: {answer}")
     assert answer == 205615
