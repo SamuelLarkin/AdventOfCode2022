@@ -1,5 +1,6 @@
 #!/usr/bin/env  python3
 
+from collections import defaultdict
 from enum import Enum
 from itertools import product
 from typing import (
@@ -64,16 +65,6 @@ class Material(NamedTuple):
                 geode=self.geode-other.geode,
                 )
 
-    def __mul__(self, factor: int) -> "Material":
-        """
-        """
-        return Material(
-                ore=factor*self.ore,
-                clay=factor*self.clay,
-                obsidian=factor*self.obsidian,
-                geode=factor*self.geode,
-                )
-
     def __ge__(self, other: "Material") -> bool:
         """
         """
@@ -136,7 +127,7 @@ class State(NamedTuple):
     def score(self) -> int:
         """
         """
-        return self.robots[Robot.geode.value] + self.future_score
+        return self.material.geode + self.future_score
 
 
     def __lt__(self, other) -> bool:
@@ -151,9 +142,9 @@ def compute_future_score(max_robot_needed, robots, minutes_left: int) -> int:
     """
     #return robots[Robot.geode.value] * minutes_left
     return robots[Robot.geode.value] * minutes_left \
-            - max(0, max_robot_needed[Robot.ore] - robots[Robot.ore.value]) \
-            - max(0, max_robot_needed[Robot.clay] - robots[Robot.clay.value]) \
-            - max(0, max_robot_needed[Robot.obsidian] - robots[Robot.obsidian.value])
+            - 4 * max(0, max_robot_needed[Robot.ore] - robots[Robot.ore.value]) \
+            - 2 * max(0, max_robot_needed[Robot.clay] - robots[Robot.clay.value]) \
+            - 1 * max(0, max_robot_needed[Robot.obsidian] - robots[Robot.obsidian.value])
 
 
 
@@ -177,22 +168,33 @@ def extract_geodes(blueprint: Blueprint) -> int:
     """
     """
     max_robot_needed = find_max_robot_needed(blueprint)
+    print(max_robot_needed)
+    max_possible_geode_so_far = defaultdict(lambda: 0)
     states = [
             State(minutes=MINUTES, next_robot=robot)
             for robot in Robot
             ]
-    states = [State(minutes=MINUTES, next_robot=Robot.clay)]
     test = []
     while len(states) > 0:
-        print(len(states))
+        #print(len(states))
         state = heapq.heappop(states)
 
         if state.minutes <= 0:
-            test.append(state.material.geode)
+            #print(state)
+            test.append(state)
             continue
-            #return state.material.geode
+            return state.material.geode
+
+        if state.robots[state.next_robot.value] >= max_robot_needed[state.next_robot]:
+            # We don't need anymore of this type of robot.
+            continue
 
         minutes = state.minutes - 1
+        if state.material.geode < max_possible_geode_so_far[minutes]:
+            continue
+        else:
+            max_possible_geode_so_far[minutes] = state.material.geode
+
         if state.material >= blueprint.robots[state.next_robot.value]:
             # Do we have enough material to build our next robot?
             material = state.material - blueprint.robots[state.next_robot.value]
@@ -202,9 +204,6 @@ def extract_geodes(blueprint: Blueprint) -> int:
             robots[state.next_robot.value] += 1
             if True:
                 for next_robot in Robot:
-                    if state.robots[next_robot.value] >= max_robot_needed[next_robot]:
-                        # We don't need anymore of this type of robot.
-                        continue
                     new_state = State(
                             minutes=minutes,
                             material=material,
@@ -247,7 +246,7 @@ def extract_geodes(blueprint: Blueprint) -> int:
                     )
             heapq.heappush(states, state)
 
-    return None
+    return max(s.material.geode for s in test)
 
 
 
@@ -279,10 +278,10 @@ def part2() -> int:
 
 
 if __name__ == "__main__":
-    assert (answer := part1("test")) == 9, answer
+    assert (answer := part1("test")) == 33, answer
     answer = part1()
     print(f"Part1 answer: {answer}")
-    assert answer == 69289
+    assert answer == 1346
 
     print()
 
