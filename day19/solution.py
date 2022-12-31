@@ -3,6 +3,7 @@
 from collections import defaultdict
 from enum import Enum
 from itertools import product
+from tqdm import tqdm
 from typing import (
         Callable,
         Generator,
@@ -167,33 +168,30 @@ def extract_geodes(blueprint: Blueprint, MINUTES: int) -> int:
     """
     """
     max_robot_needed = find_max_robot_needed(blueprint)
-    print(max_robot_needed)
+    #print(max_robot_needed)
     max_possible_geode_so_far = defaultdict(lambda: 0)
     states = [
             State(minutes=MINUTES, next_robot=robot)
             for robot in Robot
             ]
-    test = []
     while len(states) > 0:
         #print(len(states))
         state = heapq.heappop(states)
 
+        if state.material.geode < max_possible_geode_so_far[state.minutes]:
+            continue
+        else:
+            max_possible_geode_so_far[state.minutes] = state.material.geode
+
         if state.minutes <= 0:
             #print(state)
-            test.append(state)
             continue
-            return state.material.geode
 
         if state.robots[state.next_robot.value] >= max_robot_needed[state.next_robot]:
             # We don't need anymore of this type of robot.
             continue
 
         minutes = state.minutes - 1
-        if state.material.geode < max_possible_geode_so_far[minutes]:
-            continue
-        else:
-            max_possible_geode_so_far[minutes] = state.material.geode
-
         if state.material >= blueprint.robots[state.next_robot.value]:
             # Do we have enough material to build our next robot?
             material = state.material - blueprint.robots[state.next_robot.value]
@@ -201,22 +199,7 @@ def extract_geodes(blueprint: Blueprint, MINUTES: int) -> int:
             material = material + state.robots
             robots = [ v for v in state.robots ]
             robots[state.next_robot.value] += 1
-            if True:
-                for next_robot in Robot:
-                    new_state = State(
-                            minutes=minutes,
-                            material=material,
-                            robots=robots,
-                            next_robot=next_robot,
-                            future_score=compute_future_score(
-                                max_robot_needed,
-                                robots,
-                                minutes,
-                                ),
-                            )
-                    heapq.heappush(states, new_state)
-            else:
-                next_robot = Robot.ore
+            for next_robot in Robot:
                 new_state = State(
                         minutes=minutes,
                         material=material,
@@ -245,7 +228,7 @@ def extract_geodes(blueprint: Blueprint, MINUTES: int) -> int:
                     )
             heapq.heappush(states, state)
 
-    return max(s.material.geode for s in test)
+    return max_possible_geode_so_far[0]
 
 
 
@@ -257,10 +240,10 @@ def part1(data: str="data") -> int:
 
     quality_level = 0
     #print(*blueprints, sep="\n")
-    for blueprint in blueprints:
-        print(blueprint)
+    for blueprint in tqdm(blueprints):
+        #print(blueprint)
         num_geode = extract_geodes(blueprint, 24)
-        print(num_geode)
+        #print(num_geode)
         quality_level += blueprint.bid * num_geode
 
     return quality_level
@@ -277,10 +260,10 @@ def part2(data: str="data") -> int:
 
     quality_level = 1
     #print(*blueprints, sep="\n")
-    for blueprint in blueprints[:3]:
-        print(blueprint)
+    for blueprint in tqdm(blueprints[:3]):
+        #print(blueprint)
         num_geode = extract_geodes(blueprint, 32)
-        print(num_geode)
+        #print(num_geode)
         quality_level *= num_geode
 
     return quality_level
