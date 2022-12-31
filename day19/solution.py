@@ -19,7 +19,6 @@ import re
 
 
 
-MINUTES = 24
 class Robot(Enum):
     geode=0
     obsidian=1
@@ -164,7 +163,7 @@ def find_max_robot_needed(blueprint: Blueprint):
 
 
 
-def extract_geodes(blueprint: Blueprint) -> int:
+def extract_geodes(blueprint: Blueprint, MINUTES: int) -> int:
     """
     """
     max_robot_needed = find_max_robot_needed(blueprint)
@@ -260,7 +259,7 @@ def part1(data: str="data") -> int:
     #print(*blueprints, sep="\n")
     for blueprint in blueprints:
         print(blueprint)
-        num_geode = extract_geodes(blueprint)
+        num_geode = extract_geodes(blueprint, 24)
         print(num_geode)
         quality_level += blueprint.bid * num_geode
 
@@ -268,10 +267,23 @@ def part1(data: str="data") -> int:
 
 
 
-def part2() -> int:
+def part2(data: str="data") -> int:
     """
+    Don't worry about quality levels; instead, just determine the largest
+    number of geodes you could open using each of the first three blueprints.
+    What do you get if you multiply these numbers together?
     """
-    return 0
+    blueprints = list(parser(data))
+
+    quality_level = 1
+    #print(*blueprints, sep="\n")
+    for blueprint in blueprints[:3]:
+        print(blueprint)
+        num_geode = extract_geodes(blueprint, 32)
+        print(num_geode)
+        quality_level *= num_geode
+
+    return quality_level
 
 
 
@@ -285,7 +297,7 @@ if __name__ == "__main__":
 
     print()
 
-    assert (answer := part2("test")) == 152, answer
+    assert (answer := part2("test")) == 56 * 62, answer
     answer = part2()
     print(f"Part2 answer: {answer}")
-    assert answer == 205615
+    assert answer == 7644
