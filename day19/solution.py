@@ -172,6 +172,28 @@ def extract_geodes(blueprint: Blueprint) -> int:
         if state.minutes <= 0:
             return state.material.geode
 
+        # We simply collect the new material.
+        #material = Material(
+        #        ore=state.material[0]+state.robots[0],
+        #        clay=state.material[1]+state.robots[1],
+        #        obsidian=state.material[2]+state.robots[2],
+        #        geode=state.material[3]+state.robots[3],
+        #        )
+        material = Material(*[
+            c+n for c, n in zip(state.material, state.robots)
+            ])
+        minutes = state.minutes - 1
+        state = State(
+                minutes=minutes,
+                material=material,
+                robots=state.robots,
+                next_robot=state.next_robot,
+                future_score=compute_future_score(
+                    state.robots[Robot.geode.value],
+                    minutes,
+                    )
+                )
+
         if state.next_robot is None:
             # Here we simply select the next robot to build.
             for robot in Robot:
@@ -181,41 +203,18 @@ def extract_geodes(blueprint: Blueprint) -> int:
                 new_state = state._replace(next_robot=robot)
                 heapq.heappush(states, new_state)
         elif state.material >= blueprint.robots[state.next_robot.value]:
-                # Do we have enough material to build our next robot?
-                material = state.material - blueprint.robots[state.next_robot.value]
-                robots = [ v for v in state.robots ]
-                robots[state.next_robot.value] += 1
-                new_state = State(
-                        minutes=state.minutes,
-                        material=material,
-                        robots=robots,
-                        next_robot=None,
-                        future_score=compute_future_score(
-                            robots[Robot.geode.value],
-                            state.minutes,
-                            )
-                        )
-                heapq.heappush(states, new_state)
-        else:
-            # We simply collect the new material.
-            #material = Material(
-            #        ore=state.material[0]+state.robots[0],
-            #        clay=state.material[1]+state.robots[1],
-            #        obsidian=state.material[2]+state.robots[2],
-            #        geode=state.material[3]+state.robots[3],
-            #        )
-            material = Material(*[
-                c+n for c, n in zip(state.material, state.robots)
-                ])
-            minutes = state.minutes - 1
+            # Do we have enough material to build our next robot?
+            material = state.material - blueprint.robots[state.next_robot.value]
+            robots = [ v for v in state.robots ]
+            robots[state.next_robot.value] += 1
             new_state = State(
-                    minutes=minutes,
+                    minutes=state.minutes,
                     material=material,
-                    robots=state.robots,
-                    next_robot=state.next_robot,
+                    robots=robots,
+                    next_robot=None,
                     future_score=compute_future_score(
-                        state.robots[Robot.geode.value],
-                        minutes,
+                        robots[Robot.geode.value],
+                        state.minutes,
                         )
                     )
             heapq.heappush(states, new_state)
