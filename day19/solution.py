@@ -35,15 +35,24 @@ class Material(NamedTuple):
     clay: int=0
     ore: int=0
 
-    def __add__(self, other: "Material") -> "Material":
+    def __add__(self, other: Union["Material", List[int]]) -> "Material":
         """
         """
-        return Material(
-                ore=self.ore+other.ore,
-                clay=self.clay+other.clay,
-                obsidian=self.obsidian+other.obsidian,
-                geode=self.geode+other.geode,
-                )
+        if isinstance(other, Sequence):
+            assert len(other) == 4
+            return Material(
+                    ore=self.ore+other[Robot.ore.value],
+                    clay=self.clay+other[Robot.clay.value],
+                    obsidian=self.obsidian+other[Robot.obsidian.value],
+                    geode=self.geode+other[Robot.geode.value],
+                    )
+        else:
+            return Material(
+                    ore=self.ore+other.ore,
+                    clay=self.clay+other.clay,
+                    obsidian=self.obsidian+other.obsidian,
+                    geode=self.geode+other.geode,
+                    )
 
     def __sub__(self, other: "Material") -> "Material":
         """
@@ -137,10 +146,14 @@ class State(NamedTuple):
 
 
 
-def compute_future_score(num_geode_robots: int, minutes_left: int) -> int:
+def compute_future_score(max_robot_needed, robots, minutes_left: int) -> int:
     """
     """
-    return num_geode_robots * minutes_left
+    #return robots[Robot.geode.value] * minutes_left
+    return robots[Robot.geode.value] * minutes_left \
+            - max(0, max_robot_needed[Robot.ore] - robots[Robot.ore.value]) \
+            - max(0, max_robot_needed[Robot.clay] - robots[Robot.clay.value]) \
+            - max(0, max_robot_needed[Robot.obsidian] - robots[Robot.obsidian.value])
 
 
 
@@ -168,50 +181,70 @@ def extract_geodes(blueprint: Blueprint) -> int:
             State(minutes=MINUTES, next_robot=robot)
             for robot in Robot
             ]
+    states = [State(minutes=MINUTES, next_robot=Robot.clay)]
+    test = []
     while len(states) > 0:
         print(len(states))
         state = heapq.heappop(states)
 
         if state.minutes <= 0:
-            return state.material.geode
+            test.append(state.material.geode)
+            continue
+            #return state.material.geode
 
-        # We collect the new material.
-        material = Material(*[
-            c+n for c, n in zip(state.material, state.robots)
-            ])
         minutes = state.minutes - 1
-        state = State(
-                minutes=minutes,
-                material=material,
-                robots=state.robots,
-                next_robot=state.next_robot,
-                future_score=compute_future_score(
-                    state.robots[Robot.geode.value],
-                    minutes,
-                    )
-                )
-
         if state.material >= blueprint.robots[state.next_robot.value]:
             # Do we have enough material to build our next robot?
             material = state.material - blueprint.robots[state.next_robot.value]
+            # We collect the new material.
+            material = material + state.robots
             robots = [ v for v in state.robots ]
             robots[state.next_robot.value] += 1
-            for next_robot in Robot:
-                if state.robots[next_robot.value] >= max_robot_needed[next_robot]:
-                    # We don't need anymore of this type of robot.
-                    continue
+            if True:
+                for next_robot in Robot:
+                    if state.robots[next_robot.value] >= max_robot_needed[next_robot]:
+                        # We don't need anymore of this type of robot.
+                        continue
+                    new_state = State(
+                            minutes=minutes,
+                            material=material,
+                            robots=robots,
+                            next_robot=next_robot,
+                            future_score=compute_future_score(
+                                max_robot_needed,
+                                robots,
+                                minutes,
+                                ),
+                            )
+                    heapq.heappush(states, new_state)
+            else:
+                next_robot = Robot.ore
                 new_state = State(
-                        minutes=state.minutes,
+                        minutes=minutes,
                         material=material,
                         robots=robots,
                         next_robot=next_robot,
                         future_score=compute_future_score(
-                            robots[Robot.geode.value],
-                            state.minutes,
-                            )
+                            max_robot_needed,
+                            robots,
+                            minutes,
+                            ),
                         )
                 heapq.heappush(states, new_state)
         else:
+            # We collect the new material.
+            material = state.material + state.robots
+            state = State(
+                    minutes=minutes,
+                    material=material,
+                    robots=state.robots,
+                    next_robot=state.next_robot,
+                    future_score=compute_future_score(
+                        max_robot_needed,
+                        state.robots,
+                        minutes,
+                        ),
+                    )
             heapq.heappush(states, state)
 
     return None
