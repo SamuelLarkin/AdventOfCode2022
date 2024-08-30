@@ -7,19 +7,13 @@ from itertools import (
         )
 from operator import (
         attrgetter,
-        itemgetter,
         )
 from tqdm import trange
 from typing import (
-        Callable,
         Generator,
-        Iterable,
-        List,
         NamedTuple,
         Sequence,
         Set,
-        Tuple,
-        Union,
         )
 
 
@@ -55,58 +49,58 @@ class Block(NamedTuple):
 
 
 
-def generate_block() -> Block:
+def generate_block() -> Generator[Block, None, None]:
     """
     """
     # -
-    yield Block((
+    yield Block(set((
             Position(0, 0),
             Position(1, 0),
             Position(2, 0),
             Position(3, 0),
-            ),
+            )),
             4,
             1,
             )
     # +
-    yield Block((
+    yield Block(set((
             Position(1, 0),
             Position(0, 1),
             Position(1, 1),
             Position(2, 1),
             Position(1, 2),
-            ),
+            )),
             3,
             3,
             )
     # L
-    yield Block((
+    yield Block(set((
             Position(0, 0),
             Position(1, 0),
             Position(2, 0),
             Position(2, 1),
             Position(2, 2),
-            ),
+            )),
             3,
             3,
             )
     # I
-    yield Block((
+    yield Block(set((
             Position(0, 0),
             Position(0, 1),
             Position(0, 2),
             Position(0, 3),
-            ),
+            )),
             1,
             4,
             )
     # #
-    yield Block((
+    yield Block(set((
             Position(0, 0),
             Position(1, 0),
             Position(0, 1),
             Position(1, 1),
-            ),
+            )),
             2,
             2,
             )
@@ -133,7 +127,7 @@ def display_cave(cave: Set[Position]):
     """
     lines = sorted(cave, key=attrgetter("y"), reverse=True)
     lines = groupby(lines, key=attrgetter("y"))
-    for y, positions in lines:
+    for _, positions in lines:
         d = ["."] * 7
         for p in positions:
             d[p.x] = "#"
@@ -142,7 +136,7 @@ def display_cave(cave: Set[Position]):
 
 
 
-def find_repeating_pattern(steps: int, directions: Iterable[Position]) -> int:
+def find_repeating_pattern(steps: int, directions: Sequence[Position]) -> int:
     """
     0 Position(x=0, y=0) 0
     8668 Position(x=0, y=13313) 13313

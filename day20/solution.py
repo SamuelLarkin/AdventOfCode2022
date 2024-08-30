@@ -5,23 +5,18 @@
 from collections import deque
 from typing import (
         Any,
-        Callable,
         Deque,
-        Generator,
         Iterable,
         List,
-        NamedTuple,
-        Sequence,
         Tuple,
-        Union,
         )
 
 
 
-def parser(data: str="data") -> List[int]:
+def parser(filename: str="data") -> List[int]:
     """
     """
-    with open(data, mode="r", encoding="UTF8") as fin:
+    with open(filename, mode="r", encoding="UTF8") as fin:
         data = list(map(int, map(str.strip, fin)))
 
     return data
@@ -143,7 +138,7 @@ def decrypt(data:Iterable[int], key:int=1, mix:int=1, check:Iterable[int]=(1000,
     result = deque(enumerate(original))
     for _ in range(mix):
         result = scramble(original,result)
-    message = [x for i,x in result]
+    message = [x for _, x in result]
     offset = message.index(0)
     M = len(message)    
     return sum( message[(p+offset)%M] for p in check)

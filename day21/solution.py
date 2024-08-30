@@ -5,11 +5,6 @@ from typing import (
         Callable,
         Dict,
         Generator,
-        Iterable,
-        List,
-        NamedTuple,
-        Sequence,
-        Tuple,
         Union,
         )
 
@@ -61,7 +56,7 @@ Node = Union[OpBinary, int]
 
 
 
-def parser(data: str="data") -> Generator[Node, None, None]:
+def parser(data: str="data") -> Generator[Tuple[str, Node], None, None]:
     """
     """
     with open(data, mode="r", encoding="UTF8") as fin:

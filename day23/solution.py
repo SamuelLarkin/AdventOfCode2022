@@ -1,24 +1,17 @@
 #!/usr/bin/env  python3
 
 from collections import Counter
-from dataclasses import dataclass
-from enum import Enum
 from itertools import (
         count,
         product,
         )
 from operator import attrgetter
 from typing import (
-        Callable,
         Dict,
         Generator,
         Iterable,
-        List,
         NamedTuple,
-        Sequence,
         Set,
-        Tuple,
-        Union,
         )
 
 
