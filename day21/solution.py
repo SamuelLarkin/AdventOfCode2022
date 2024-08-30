@@ -39,13 +39,13 @@ class OpSubstraction(OpBinary):
 @dataclass
 class OpMultiply(OpBinary):
     op: Callable[[int, int], int] = lambda a, b: a*b
-    op_inv: Callable[[int, int], int] = lambda a, b: a/b
+    op_inv: Callable[[int, int], int] = lambda a, b: a//b
 
 
 
 @dataclass
 class OpDivide(OpBinary):
-    op: Callable[[int, int], int] = lambda a, b: a/b
+    op: Callable[[int, int], int] = lambda a, b: a//b
     op_inv: Callable[[int, int], int] = lambda a, b: a*b
 
 
